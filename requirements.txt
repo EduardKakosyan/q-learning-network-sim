@@ -1,4 +1,0 @@
-simpy
-networkx
-numpy
-matplotlib
