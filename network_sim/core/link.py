@@ -6,7 +6,7 @@ between two nodes in the simulated network.
 
 import simpy
 from collections import defaultdict, deque
-from typing import Dict, Deque, List, Optional, Any
+from typing import Dict, Deque, List, Optional
 
 from network_sim.core.packet import Packet
 

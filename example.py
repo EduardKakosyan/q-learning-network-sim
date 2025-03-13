@@ -38,23 +38,17 @@ def create_dumbbell_topology(simulator):
     Returns:
         Tuple of (source_nodes, destination_nodes).
     """
-    # Create nodes
     for i in range(1, 7):
         simulator.add_node(i, processing_delay=0.001)
 
-    # Create links
-    # Left side
-    simulator.add_link(1, 3, 10e6, 0.01, 64000)  # 10 Mbps, 10ms delay, 64KB buffer
+    simulator.add_link(1, 3, 10e6, 0.01, 64000)
     simulator.add_link(2, 3, 10e6, 0.01, 64000)
 
-    # Bottleneck link
-    simulator.add_link(3, 4, 5e6, 0.02, 32000)  # 5 Mbps, 20ms delay, 32KB buffer
+    simulator.add_link(3, 4, 5e6, 0.02, 32000)
 
-    # Right side
     simulator.add_link(4, 5, 10e6, 0.01, 64000)
     simulator.add_link(4, 6, 10e6, 0.01, 64000)
 
-    # Compute routing tables
     simulator.compute_shortest_paths()
 
     return ([1, 2], [5, 6])
@@ -70,33 +64,27 @@ def run_simulation(scheduler_type, duration=10.0):
     Returns:
         NetworkSimulator instance after simulation.
     """
-    # Create simulator
     env = simpy.Environment()
     simulator = NetworkSimulator(env=env, scheduler_type=scheduler_type)
 
-    # Create network topology
     source_nodes, dest_nodes = create_dumbbell_topology(simulator)
 
-    # Create traffic flows
-    # Flow 1: Constant bit rate
     simulator.packet_generator(
         source=source_nodes[0],
         destination=dest_nodes[0],
-        packet_size=constant_size(1000),  # 1000 bytes
-        interval=constant_traffic(100),  # 100 packets per second
+        packet_size=constant_size(1000),
+        interval=constant_traffic(100),
         pattern=TrafficPattern.CONSTANT,
     )
 
-    # Flow 2: Poisson traffic
     simulator.packet_generator(
         source=source_nodes[1],
         destination=dest_nodes[1],
-        packet_size=variable_size(500, 1500),  # 500-1500 bytes
-        interval=poisson_traffic(80),  # 80 packets per second average
+        packet_size=variable_size(500, 1500),
+        interval=poisson_traffic(80),
         pattern=TrafficPattern.VARIABLE,
     )
 
-    # Run simulation
     simulator.run(duration)
 
     return simulator
@@ -104,10 +92,8 @@ def run_simulation(scheduler_type, duration=10.0):
 
 def main():
     """Run simulations with different schedulers and compare results."""
-    # Create results directory
     os.makedirs("results", exist_ok=True)
 
-    # Run simulations with different schedulers
     schedulers = ["FIFO", "RR"]
     simulators = []
     metrics_list = []
@@ -118,7 +104,6 @@ def main():
         simulators.append(simulator)
         metrics_list.append(simulator.metrics)
 
-        # Save individual results
         save_network_visualization(
             simulator, f"results/{scheduler.lower()}_topology.png"
         )
@@ -132,14 +117,11 @@ def main():
             simulator.metrics, f"results/{scheduler.lower()}_metrics.json"
         )
 
-        # Calculate and print fairness index
         fairness = calculate_fairness_index(simulator)
         print(f"  Fairness index: {fairness:.4f}")
 
-    # Compare schedulers
     comparison = compare_schedulers(simulators)
 
-    # Plot comparison metrics
     plot_metrics(metrics_list, schedulers)
 
     print("\nSimulation complete. Results saved to 'results' directory.")

@@ -207,67 +207,74 @@ class NetworkSimulator:
 
         return self.env.process(generator_process())
 
-    def process_packet(self, packet: Packet) -> simpy.events.Generator:
+    def process_packet(self, packet: Packet) -> simpy.events.Process:
         """Process a packet's journey through the network.
 
         Args:
             packet: The Packet object to process.
 
         Returns:
-            SimPy generator for the packet journey.
+            SimPy process for the packet journey.
         """
-        current_node = self.nodes[packet.current_node]
 
-        if packet.current_node == packet.destination:
-            yield self.env.timeout(current_node.processing_delay)
-            self.packet_arrived(packet)
-            return
+        # Define the generator function directly
+        def packet_journey():
+            current_node = self.nodes[packet.current_node]
 
-        next_hop = current_node.get_next_hop(packet.destination)
+            if packet.current_node == packet.destination:
+                yield self.env.timeout(current_node.processing_delay)
+                self.packet_arrived(packet)
+                return
 
-        if next_hop is None:
-            self.packet_dropped(packet, "No route to destination")
-            return
+            next_hop = current_node.get_next_hop(packet.destination)
+            if next_hop is None:
+                self.packet_dropped(packet, "No route to destination")
+                yield self.env.timeout(0)
+                return
 
-        link = current_node.links.get(next_hop)
+            link = current_node.links.get(next_hop)
+            if link is None:
+                self.packet_dropped(packet, "No link to next hop")
+                yield self.env.timeout(0)
+                return
 
-        if link is None:
-            self.packet_dropped(packet, "No link to next hop")
-            return
+            if not link.can_queue_packet(packet):
+                self.packet_dropped(packet, "Buffer overflow")
+                link.packets_dropped += 1
+                yield self.env.timeout(0)
+                return
 
-        if not link.can_queue_packet(packet):
-            self.packet_dropped(packet, "Buffer overflow")
-            link.packets_dropped += 1
-            return
+            queuing_start = self.env.now
+            link.buffer_usage += packet.size
+            link.add_packet_to_queue(packet, self.scheduler_type)
 
-        queuing_start = self.env.now
-        link.buffer_usage += packet.size
-        link.add_packet_to_queue(packet, self.scheduler_type)
+            with link.resource.request() as request:
+                yield request
 
-        with link.resource.request() as request:
-            yield request
+                next_packet = link.get_next_packet(self.scheduler_type)
+                if next_packet and next_packet.id == packet.id:
+                    queuing_delay = self.env.now - queuing_start
+                    packet.record_queuing_delay(queuing_delay)
 
-            next_packet = link.get_next_packet(self.scheduler_type)
+                    transmission_delay = link.calculate_transmission_delay(packet.size)
+                    yield self.env.timeout(transmission_delay)
+                    yield self.env.timeout(link.propagation_delay)
 
-            if next_packet and next_packet.id == packet.id:
-                queuing_delay = self.env.now - queuing_start
-                packet.record_queuing_delay(queuing_delay)
+                    link.buffer_usage -= packet.size
+                    link.packets_sent += 1
+                    link.bytes_sent += packet.size
 
-                transmission_delay = link.calculate_transmission_delay(packet.size)
+                    packet.record_hop(next_hop, self.env.now)
 
-                yield self.env.timeout(transmission_delay)
+                    # Create a new process for the next hop
+                    next_process = self.process_packet(packet)
+                    self.env.process(next_process)
+                else:
+                    self.packet_dropped(packet, "Scheduling error")
+                    yield self.env.timeout(0)
 
-                yield self.env.timeout(link.propagation_delay)
-
-                link.buffer_usage -= packet.size
-                link.packets_sent += 1
-                link.bytes_sent += packet.size
-
-                packet.record_hop(next_hop, self.env.now)
-
-                self.env.process(self.process_packet(packet))
-            else:
-                self.packet_dropped(packet, "Scheduling error")
+        # Return the generator function directly
+        return packet_journey()
 
     def packet_arrived(self, packet: Packet) -> None:
         """Handle packet arrival at destination.
