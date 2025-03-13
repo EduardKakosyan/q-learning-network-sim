@@ -79,6 +79,6 @@ ipython_config.py
 *.svg
 *.pdf
 
-
+.ruff_cache/
 # Exceptions - keep specific files/folders
 !results/.gitkeep 
