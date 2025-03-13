@@ -6,7 +6,7 @@ between two nodes in the simulated network.
 
 import simpy
 from collections import defaultdict, deque
-from typing import Dict, Deque, List, Optional
+from typing import Dict, Deque, List, Optional, Any
 
 from network_sim.core.packet import Packet
 
@@ -122,15 +122,67 @@ class Link:
         else:
             self.queue.append(packet)
 
-    def get_next_packet(self, scheduler_type: str) -> Optional[Packet]:
+    def get_next_packet(
+        self, scheduler_type: str, scheduler: Optional[Any] = None
+    ) -> Optional[Packet]:
         """Get the next packet to transmit based on scheduler type.
 
         Args:
             scheduler_type: Type of scheduler being used.
+            scheduler: Scheduler object (if provided).
 
         Returns:
             The next packet to transmit or None if no packets are available.
         """
+        # If a scheduler object is provided, use it
+        if scheduler is not None:
+            # For FIFO, use the main queue
+            if scheduler_type == "FIFO":
+                if not self.queue:
+                    return None
+                packet = scheduler.select_next_packet(self.queue, self)
+                if packet:
+                    self.queue.remove(packet)
+                    return packet
+                return None
+
+            # For RR, use the flow queues
+            elif scheduler_type == "RR":
+                if not self.active_flows:
+                    return None
+
+                # Convert flow queues to a list for the scheduler
+                all_packets = []
+                for flow_id in self.active_flows:
+                    all_packets.extend(self.flow_queues[flow_id])
+
+                if not all_packets:
+                    return None
+
+                packet = scheduler.select_next_packet(all_packets, self)
+                if packet:
+                    # Remove the packet from its flow queue
+                    flow_id = packet.flow_id
+                    self.flow_queues[flow_id].remove(packet)
+
+                    # If the flow queue is now empty, remove it from active flows
+                    if not self.flow_queues[flow_id]:
+                        self.active_flows.remove(flow_id)
+
+                    return packet
+                return None
+
+            # For QL or other schedulers, use the main queue
+            else:
+                if not self.queue:
+                    return None
+                packet = scheduler.select_next_packet(self.queue, self)
+                if packet:
+                    self.queue.remove(packet)
+                    return packet
+                return None
+
+        # Fall back to the original implementation if no scheduler is provided
         if scheduler_type == "FIFO":
             return self.queue.popleft() if self.queue else None
 

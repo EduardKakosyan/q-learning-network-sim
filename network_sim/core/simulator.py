@@ -16,6 +16,12 @@ from network_sim.core.packet import Packet
 from network_sim.core.link import Link
 from network_sim.core.node import Node
 from network_sim.core.enums import TrafficPattern
+from network_sim.core.scheduling_algorithms import (
+    SchedulingAlgorithm,
+    FIFOScheduler,
+    RoundRobinScheduler,
+    QLearningScheduler,
+)
 
 
 class NetworkSimulator:
@@ -31,6 +37,7 @@ class NetworkSimulator:
         completed_packets: Packets that reached their destination.
         dropped_packets: Packets that were dropped.
         scheduler_type: Type of scheduler to use.
+        scheduler: Scheduler object.
         metrics: Performance metrics for the simulation.
     """
 
@@ -56,6 +63,18 @@ class NetworkSimulator:
         self.completed_packets: List[Packet] = []
         self.dropped_packets: List[Tuple[Packet, str]] = []
         self.scheduler_type = scheduler_type
+
+        # Create the appropriate scheduler
+        if scheduler_type == "FIFO":
+            self.scheduler = FIFOScheduler(self.env)
+        elif scheduler_type == "RR":
+            self.scheduler = RoundRobinScheduler(self.env)
+        elif scheduler_type == "QL":
+            self.scheduler = QLearningScheduler(self.env)
+        else:
+            # Default to FIFO
+            self.scheduler = FIFOScheduler(self.env)
+            self.scheduler_type = "FIFO"
 
         random.seed(seed)
         np.random.seed(seed)
@@ -251,7 +270,7 @@ class NetworkSimulator:
             with link.resource.request() as request:
                 yield request
 
-                next_packet = link.get_next_packet(self.scheduler_type)
+                next_packet = link.get_next_packet(self.scheduler_type, self.scheduler)
                 if next_packet and next_packet.id == packet.id:
                     queuing_delay = self.env.now - queuing_start
                     packet.record_queuing_delay(queuing_delay)
@@ -376,6 +395,18 @@ class NetworkSimulator:
             scheduler_type: Type of scheduler to use ("FIFO", "RR", or "QL").
         """
         self.scheduler_type = scheduler_type
+
+        # Create the appropriate scheduler
+        if scheduler_type == "FIFO":
+            self.scheduler = FIFOScheduler(self.env)
+        elif scheduler_type == "RR":
+            self.scheduler = RoundRobinScheduler(self.env)
+        elif scheduler_type == "QL":
+            self.scheduler = QLearningScheduler(self.env)
+        else:
+            # Default to FIFO
+            self.scheduler = FIFOScheduler(self.env)
+            self.scheduler_type = "FIFO"
 
     def visualize_network(self, figsize: Tuple[int, int] = (10, 8)) -> plt.Figure:
         """Visualize the network topology.

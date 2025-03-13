@@ -94,7 +94,7 @@ def main():
     """Run simulations with different schedulers and compare results."""
     os.makedirs("results", exist_ok=True)
 
-    schedulers = ["FIFO", "RR"]
+    schedulers = ["FIFO", "RR", "QL"]
     simulators = []
     metrics_list = []
 
