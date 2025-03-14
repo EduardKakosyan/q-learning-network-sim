@@ -4,10 +4,14 @@ This module defines the Node class, which represents a network node
 (router, switch, host) in the simulated network.
 """
 
+from collections import deque
+import time
 import simpy
-from typing import Dict, Optional
+from typing import Deque, Dict, Optional, Tuple
 
 from network_sim.core.link import Link
+from network_sim.core.packet import Packet
+from network_sim.core.scheduling_algorithms import SchedulingAlgorithm, FIFOScheduler
 
 
 class Node:
@@ -16,21 +20,19 @@ class Node:
     Attributes:
         env: SimPy environment.
         id: Unique identifier for the node.
-        processing_delay: Time to process a packet in seconds.
         buffer_size: Maximum buffer size in bytes.
         links: Outgoing links keyed by destination.
         routing_table: Next hop for each destination.
         packets_received: Number of packets received by this node.
         packets_dropped: Number of packets dropped by this node.
-        packets_forwarded: Number of packets forwarded by this node.
-        is_destination: Whether this node is a destination.
+        resource: SimPy resource for node scheduling control.
     """
 
     def __init__(
         self,
         env: simpy.Environment,
         node_id: int,
-        processing_delay: float = 0,
+        scheduler: Optional[SchedulingAlgorithm] = None,
         buffer_size: float = float("inf"),
     ):
         """Initialize a network node.
@@ -38,19 +40,20 @@ class Node:
         Args:
             env: SimPy environment.
             node_id: Unique identifier for the node.
-            processing_delay: Time to process a packet in seconds.
+            scheduler: Scheduling algorithm for packet processing.
             buffer_size: Maximum buffer size in bytes (default: infinite).
         """
         self.env = env
         self.id = node_id
-        self.processing_delay = processing_delay
+        self.scheduler = scheduler if scheduler else FIFOScheduler()
+        self.buffer_usage = 0
         self.buffer_size = buffer_size
         self.links: Dict[int, Link] = {}
         self.routing_table: Dict[int, int] = {}
         self.packets_received = 0
         self.packets_dropped = 0
-        self.packets_forwarded = 0
-        self.is_destination = False
+        self.queue: Deque[Packet] = deque()
+        self.resource = simpy.Resource(env, capacity=1)
 
     def add_link(self, link: Link) -> None:
         """Add an outgoing link from this node.
@@ -79,6 +82,48 @@ class Node:
             Next hop node ID or None if no route exists.
         """
         return self.routing_table.get(destination)
+    
+    def can_queue_packet(self, packet: Packet) -> bool:
+        """Check if there's enough buffer space for the packet.
+
+        Args:
+            packet: The packet to check.
+
+        Returns:
+            True if there's enough buffer space, False otherwise.
+        """
+        return self.buffer_usage + packet.size <= self.buffer_size
+
+    def add_packet_to_queue(self, packet: Packet) -> None:
+        """Add a packet to the appropriate queue based on scheduler type.
+
+        Args:
+            packet: The packet to add.
+            scheduler: Scheduler object.
+        """
+        self.queue.append(packet)
+        self.buffer_usage += packet.size
+
+    def get_next_packet(self, link: Link) -> Tuple[Optional[Packet], float]:
+        """Get the next packet to transmit based on scheduler type.
+
+        Args:
+            scheduler: Scheduler object.
+
+        Returns:
+            The next packet to transmit or None if no packets are available, and
+            the scheduling delay.
+        """
+        start_time = time.perf_counter()
+        packet = self.scheduler.select_next_packet(self)
+        end_time = time.perf_counter()
+        scheduling_delay = end_time - start_time
+
+        if packet:
+            self.queue.remove(packet)
+            self.buffer_usage -= packet.size
+        
+        return packet, scheduling_delay
 
     def __repr__(self) -> str:
         """Return string representation of the node.

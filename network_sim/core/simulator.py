@@ -8,9 +8,8 @@ import simpy
 import networkx as nx
 import random
 import numpy as np
-import matplotlib.pyplot as plt
 from collections import defaultdict
-from typing import Dict, List, Set, Tuple, Callable, Optional, Any, Union
+from typing import Dict, List, Set, Tuple, Callable, Optional, Any
 
 from network_sim.core.packet import Packet
 from network_sim.core.link import Link
@@ -31,26 +30,24 @@ class NetworkSimulator:
         active_packets: Packets currently in transit.
         completed_packets: Packets that reached their destination.
         dropped_packets: Packets that were dropped.
-        scheduler_type: Type of scheduler to use.
-        scheduler: Scheduler object.
         metrics: Performance metrics for the simulation.
     """
 
     def __init__(
         self,
         env: simpy.Environment,
-        scheduler: SchedulingAlgorithm,
+        scheduler_type: str,
         seed: int = 42,
     ):
         """Initialize the network simulator.
 
         Args:
             env: SimPy environment.
-            scheduler: The scheduler to use.
+            scheduler_type: The scheduler type that is used.
             seed: Random seed for reproducibility.
         """
         self.env = env
-        self.scheduler = scheduler
+        self.scheduler_type = scheduler_type
         self.graph = nx.DiGraph()
         self.nodes: Dict[int, Node] = {}
         self.links: Dict[Tuple[int, int], Link] = {}
@@ -73,20 +70,19 @@ class NetworkSimulator:
     def add_node(
         self,
         node_id: int,
-        processing_delay: float = 0,
+        scheduler: Optional[SchedulingAlgorithm] = None,
         buffer_size: float = float("inf"),
     ) -> Node:
         """Add a node to the network.
 
         Args:
             node_id: Unique identifier for the node.
-            processing_delay: Time to process a packet in seconds.
             buffer_size: Maximum buffer size in bytes.
 
         Returns:
             The created Node object.
         """
-        node = Node(self.env, node_id, processing_delay, buffer_size)
+        node = Node(self.env, node_id, scheduler, buffer_size)
         self.nodes[node_id] = node
         self.graph.add_node(node_id)
         return node
@@ -96,8 +92,7 @@ class NetworkSimulator:
         source: int,
         target: int,
         capacity: float,
-        propagation_delay: float,
-        buffer_size: float = float("inf"),
+        propagation_delay: float
     ) -> Link:
         """Add a link between nodes.
 
@@ -114,7 +109,7 @@ class NetworkSimulator:
         if source not in self.nodes or target not in self.nodes:
             raise ValueError(f"Nodes {source} and/or {target} do not exist")
 
-        link = Link(self.env, source, target, capacity, propagation_delay, buffer_size)
+        link = Link(self.env, source, target, capacity, propagation_delay)
         self.links[(source, target)] = link
         self.nodes[source].add_link(link)
         self.graph.add_edge(
@@ -122,7 +117,6 @@ class NetworkSimulator:
             target,
             capacity=capacity,
             delay=propagation_delay,
-            buffer=buffer_size,
         )
         return link
 
@@ -137,21 +131,18 @@ class NetworkSimulator:
                     routing_table[destination] = path[1]
             self.nodes[source].set_routing_table(routing_table)
 
-    def create_packet(
-        self, source: int, destination: int, size: int, priority: int = 0
-    ) -> Packet:
+    def create_packet(self, source: int, destination: int, size: int) -> Packet:
         """Create a new packet.
 
         Args:
             source: Source node ID.
             destination: Destination node ID.
             size: Size of packet in bytes.
-            priority: Priority level (higher means more important).
 
         Returns:
             The created Packet object.
         """
-        packet = Packet(source, destination, size, priority, self.env.now)
+        packet = Packet(source, destination, size, self.env.now)
         self.packets.append(packet)
         self.active_packets.add(packet.id)
         return packet
@@ -160,8 +151,8 @@ class NetworkSimulator:
         self,
         source: int,
         destination: int,
-        packet_size: Union[int, Callable[[], int]],
-        interval: Union[float, Callable[[], float]],
+        packet_size: Callable[[], int],
+        interval: Callable[[], float],
         jitter: float = 0,
         pattern: TrafficPattern = TrafficPattern.CONSTANT,
         burst_size: int = 1,
@@ -172,8 +163,8 @@ class NetworkSimulator:
         Args:
             source: Source node ID.
             destination: Destination node ID.
-            packet_size: Size of packets in bytes (can be callable for variable sizes).
-            interval: Time between packets/bursts in seconds (can be callable).
+            packet_size: Size of packets in bytes.
+            interval: Time between packets/bursts in seconds.
             jitter: Random variation in interval (fraction of interval).
             pattern: Traffic pattern (CONSTANT, VARIABLE, BURSTY, MIXED).
             burst_size: Number of packets in a burst (for BURSTY pattern).
@@ -185,14 +176,14 @@ class NetworkSimulator:
 
         def generator_process():
             while True:
-                current_interval = interval() if callable(interval) else interval
+                current_interval = interval()
 
                 if jitter > 0:
                     current_interval *= 1 + random.uniform(-jitter, jitter)
 
                 if pattern == TrafficPattern.BURSTY:
                     for i in range(burst_size):
-                        size = packet_size() if callable(packet_size) else packet_size
+                        size = packet_size()
                         packet = self.create_packet(source, destination, size)
 
                         self.env.process(self.process_packet(packet))
@@ -200,7 +191,7 @@ class NetworkSimulator:
                         if i < burst_size - 1 and burst_interval is not None:
                             yield self.env.timeout(burst_interval)
                 else:
-                    size = packet_size() if callable(packet_size) else packet_size
+                    size = packet_size()
                     packet = self.create_packet(source, destination, size)
 
                     self.env.process(self.process_packet(packet))
@@ -218,65 +209,58 @@ class NetworkSimulator:
         Returns:
             SimPy process for the packet journey.
         """
-
-        # Define the generator function directly
-        def packet_journey():
+        
+        def packet_journey(packet: Packet):
             current_node = self.nodes[packet.current_node]
-
-            if packet.current_node == packet.destination:
-                yield self.env.timeout(current_node.processing_delay)
-                self.packet_arrived(packet)
-                return
-
-            next_hop = current_node.get_next_hop(packet.destination)
-            if next_hop is None:
-                self.packet_dropped(packet, "No route to destination")
-                yield self.env.timeout(0)
-                return
-
-            link = current_node.links.get(next_hop)
-            if link is None:
-                self.packet_dropped(packet, "No link to next hop")
-                yield self.env.timeout(0)
-                return
-
-            if not link.can_queue_packet(packet):
+            
+            if not current_node.can_queue_packet(packet):
                 self.packet_dropped(packet, "Buffer overflow")
-                link.packets_dropped += 1
                 yield self.env.timeout(0)
                 return
+
+            current_node.add_packet_to_queue(packet)
 
             queuing_start = self.env.now
-            link.buffer_usage += packet.size
-            link.add_packet_to_queue(packet, self.scheduler)
+            with current_node.resource.request() as node_resource:
+                yield node_resource
+                queuing_delay = self.env.now - queuing_start
+                packet.record_queuing_delay(queuing_delay)
 
-            with link.resource.request() as request:
-                yield request
+                if packet.current_node == packet.destination:
+                    self.packet_arrived(packet)
+                    return
 
-                next_packet = link.get_next_packet(self.scheduler)
-                if next_packet and next_packet.id == packet.id:
-                    queuing_delay = self.env.now - queuing_start
-                    packet.record_queuing_delay(queuing_delay)
+                next_hop = current_node.get_next_hop(packet.destination)
+                if next_hop is None:
+                    self.packet_dropped(packet, "No route to destination")
+                    return
 
-                    transmission_delay = link.calculate_transmission_delay(packet.size)
-                    yield self.env.timeout(transmission_delay)
-                    yield self.env.timeout(link.propagation_delay)
+                link = current_node.links.get(next_hop)
+                if link is None:
+                    self.packet_dropped(packet, "No link to next hop")
+                    return
 
-                    link.buffer_usage -= packet.size
-                    link.packets_sent += 1
-                    link.bytes_sent += packet.size
+                packet, scheduling_delay = current_node.get_next_packet(link)
+                if packet == None:
+                    return
+                yield self.env.timeout(scheduling_delay)
 
-                    packet.record_hop(next_hop, self.env.now)
+            queuing_start = self.env.now
+            with link.resource.request() as link_resource:
+                yield link_resource
+                queuing_delay = self.env.now - queuing_start
+                packet.record_queuing_delay(queuing_delay)
 
-                    # Create a new process for the next hop
-                    next_process = self.process_packet(packet)
-                    self.env.process(next_process)
-                else:
-                    self.packet_dropped(packet, "Scheduling error")
-                    yield self.env.timeout(0)
+                transmission_delay = link.calculate_transmission_delay(packet.size)
+                yield self.env.timeout(transmission_delay)
+        
+            yield self.env.timeout(link.propagation_delay)
+            link.bytes_sent += packet.size
 
-        # Return the generator function directly
-        return packet_journey()
+            packet.record_hop(next_hop, self.env.now)
+            self.env.process(self.process_packet(packet))
+        
+        return packet_journey(packet)
 
     def packet_arrived(self, packet: Packet) -> None:
         """Handle packet arrival at destination.
@@ -352,7 +336,7 @@ class NetworkSimulator:
         self.metrics["average_delay"] = average_delay
         self.metrics["packet_loss_rate"] = packet_loss_rate
         self.metrics["link_utilization"] = link_utilization
-        self.metrics["scheduler_type"] = self.scheduler.name
+        self.metrics["scheduler_type"] = self.scheduler_type
 
         return self.metrics
 

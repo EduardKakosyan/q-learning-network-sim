@@ -57,7 +57,7 @@ def save_network_visualization(
         graph, pos, edge_labels=edge_labels, font_size=8
     )
 
-    plt.title(f"Network Topology (Scheduler: {simulator.scheduler.name})")
+    plt.title(f"Network Topology (Scheduler: {simulator.scheduler_type})")
     plt.axis("off")
     plt.tight_layout()
 
@@ -129,7 +129,7 @@ def plot_link_utilization(
 
     plt.figure(figsize=(12, 6))
     plt.bar(links, utilizations)
-    plt.title(f"Link Utilization (Scheduler: {simulator.scheduler.name})")
+    plt.title(f"Link Utilization (Scheduler: {simulator.scheduler_type})")
     plt.ylabel("Utilization")
     plt.xlabel("Link")
     plt.xticks(rotation=45)

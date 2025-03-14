@@ -88,7 +88,7 @@ def compare_schedulers(
         Dictionary of metric comparisons.
     """
     metrics_list = [sim.metrics for sim in simulators]
-    scheduler_types = [sim.scheduler.name for sim in simulators]
+    scheduler_types = [sim.scheduler_type for sim in simulators]
 
     # Save metrics to files
     save_metrics_to_csv(
@@ -97,7 +97,7 @@ def compare_schedulers(
 
     for i, sim in enumerate(simulators):
         save_metrics_to_json(
-            sim.metrics, f"{output_dir}/{sim.scheduler.name.lower()}_metrics.json"
+            sim.metrics, f"{output_dir}/{sim.scheduler_type.lower()}_metrics.json"
         )
 
     # Create comparison dictionary

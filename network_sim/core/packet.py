@@ -16,7 +16,6 @@ class Packet:
         source: Source node ID.
         destination: Destination node ID.
         size: Size of packet in bytes.
-        priority: Priority level (higher means more important).
         creation_time: Time when packet was created.
         id: Unique identifier for the packet.
         current_node: Current node where the packet is located.
@@ -30,7 +29,6 @@ class Packet:
     source: int
     destination: int
     size: int
-    priority: int = 0
     creation_time: float = 0
     id: int = field(init=False)
     current_node: int = field(init=False)

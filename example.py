@@ -28,31 +28,6 @@ from network_sim.utils.metrics import (
 )
 
 
-def create_dumbbell_topology(simulator: NetworkSimulator):
-    """Create a dumbbell network topology.
-
-    Args:
-        simulator: NetworkSimulator instance.
-
-    Returns:
-        Tuple of (source_nodes, destination_nodes).
-    """
-    for i in range(1, 7):
-        simulator.add_node(i, processing_delay=0.001)
-
-    simulator.add_link(1, 3, 10e6, 0.01, 64000)
-    simulator.add_link(2, 3, 10e6, 0.01, 64000)
-
-    simulator.add_link(3, 4, 5e6, 0.02, 32000)
-
-    simulator.add_link(4, 5, 10e6, 0.01, 64000)
-    simulator.add_link(4, 6, 10e6, 0.01, 64000)
-
-    simulator.compute_shortest_paths()
-
-    return ([1, 2], [5, 6])
-
-
 def run_simulation(scheduler_type, duration=10.0):
     """Run a network simulation with the specified scheduler.
 
@@ -64,22 +39,32 @@ def run_simulation(scheduler_type, duration=10.0):
         NetworkSimulator instance after simulation.
     """
     env = simpy.Environment()
-    scheduler = scheduling_algorithm_factory(scheduler_type, env)
-    simulator = NetworkSimulator(env, scheduler)
+    simulator = NetworkSimulator(env, scheduler_type)
 
-    source_nodes, dest_nodes = create_dumbbell_topology(simulator)
+    scheduler_constructor = lambda: scheduling_algorithm_factory(scheduler_type)
+    simulator.add_node(1, buffer_size=32000)
+    simulator.add_node(2, buffer_size=32000)
+    simulator.add_node(3, scheduler=scheduler_constructor(), buffer_size=32000)
+    simulator.add_node(4, buffer_size=32000)
+
+    simulator.add_link(1, 3, 10e6, 0.01)
+    simulator.add_link(2, 3, 10e6, 0.01)
+
+    simulator.add_link(3, 4, 5e6, 0.02)
+
+    simulator.compute_shortest_paths()
 
     simulator.packet_generator(
-        source=source_nodes[0],
-        destination=dest_nodes[0],
+        source=1,
+        destination=4,
         packet_size=constant_size(1000),
         interval=constant_traffic(100),
         pattern=TrafficPattern.CONSTANT,
     )
 
     simulator.packet_generator(
-        source=source_nodes[1],
-        destination=dest_nodes[1],
+        source=2,
+        destination=4,
         packet_size=variable_size(500, 1500),
         interval=poisson_traffic(80),
         pattern=TrafficPattern.VARIABLE,
@@ -111,6 +96,10 @@ def main():
 
         fairness = calculate_fairness_index(simulator)
         print(f"  Fairness index: {fairness:.4f}")
+        print("Number of packets:", len(simulator.packets))
+        from collections import Counter
+        counter = Counter([reason for packet, reason in simulator.dropped_packets])
+        print(counter)
 
     compare_schedulers(simulators)
 
