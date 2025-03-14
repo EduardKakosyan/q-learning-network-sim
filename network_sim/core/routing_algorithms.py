@@ -1,21 +1,21 @@
 from abc import ABC, abstractmethod
-from collections import defaultdict, deque
+from collections import defaultdict
+from typing import Any, List, Tuple
 from network_sim.core.packet import Packet
-from typing import Deque, Optional
 import random
 
 
-class SchedulingAlgorithm(ABC):
+class Router(ABC):
     """Abstract base class for packet scheduling algorithms"""
 
     def __init__(self):
         """
         Initialize the scheduling algorithm
         """
-        self.name = "Base Scheduler"
+        self.name = "Base Router"
 
     @abstractmethod
-    def select_next_packet(self, node) -> Optional[Packet]:
+    def route_packet(self, node, packet: Packet) -> int:
         """
         Select the next packet to transmit from the queue
 
@@ -31,76 +31,68 @@ class SchedulingAlgorithm(ABC):
         return self.name
 
 
-class FIFOScheduler(SchedulingAlgorithm):
+class DijkstraRouter(Router):
     """First-In-First-Out (FIFO) scheduling algorithm"""
 
     def __init__(self):
-        self.name = "FIFO"
+        self.name = "Dijk"
 
-    def select_next_packet(self, node):
+    def route_packet(self, node, packet):
         """Select the next packet using FIFO policy"""
         if not node.queue:
-            return None
-        return node.queue[0] # Return the first packet in the queue
+            raise ValueError("Wtf")
+        next_hop = node.routing_table[packet.destination]
+        return next_hop
 
 
-class RoundRobinScheduler(SchedulingAlgorithm):
+class LeastCongestionFirstRouter(Router):
     """Round Robin (RR) scheduling algorithm"""
 
     def __init__(self):
-        self.name = "Round Robin"
-        self.flow_ids: Deque[str] = deque()
+        self.name = "LCF"
 
-    def _next_flow_id(self) -> None:
-        front = self.flow_ids.popleft()
-        self.flow_ids.append(front)
-
-    def select_next_packet(self, node):
-        """Select the next packet using Round Robin policy"""
-        if not node.queue:
-            return None
-
-        for _ in range(len(self.flow_ids)):
-            current_flow_id = self.flow_ids[0]
-            for packet in node.queue:
-                if packet.flow_id == current_flow_id:
-                    self._next_flow_id()
-                    return packet
-            self._next_flow_id()
-
-        return node.queue[0] # Default
+    def route_packet(self, node, packet):
+        smallest_buffer_usage = min(
+            [neighbour.buffer_usage() for _, neighbour in node.neighbours.items()]
+        )
+        
+        min_ids = [id for id, neighbour in node.neighbours.items() if smallest_buffer_usage == neighbour.buffer_usage()]    
+        if not min_ids:
+            raise ValueError("wtf")
+        
+        action = random.choice(min_ids)
+        
+        return action
 
 
-class QLearningScheduler(SchedulingAlgorithm):
+class QRouter(Router):
     """Q-Learning based scheduling algorithm"""
 
     def __init__(self, learning_rate=0.1, discount_factor=0.9, exploration_rate=0.1):
-        self.name = "Q-Learning"
+        self.name = "Q-Router"
         self.learning_rate = learning_rate
         self.discount_factor = discount_factor
         self.exploration_rate = exploration_rate
         self.q_table = defaultdict(lambda: defaultdict(float))
 
-    def _get_state(self, node):
+    def _get_state(self, node, packet: Packet) -> Tuple[int, int, Any]:
         """Get the current state representation"""
-        queue_length = len(node.queue)
-        buffer_usage = node.buffer_usage / node.buffer_size if node.buffer_size != float("inf") else 0
+        
+        buffer_usages = [neighbour.buffer_usage() for _, neighbour in node.neighbours.items()]
 
-        queue_length_discrete = min(queue_length // 5, 5)
-        buffer_usage_discrete = min(int(buffer_usage * 10), 9)
+        state = [packet.source, packet.destination] + buffer_usages
+        return tuple(state)
 
-        return (queue_length_discrete, buffer_usage_discrete)
-
-    def _get_actions(self, node):
+    def _get_actions(self, node) -> List[int]:
         """Get available actions in the current state"""
-        return list(range(len(node.queue))) if node.queue else []
+        return [id for id, _ in node.links.items()]
 
-    def select_next_packet(self, node):
+    def route_packet(self, node, packet):
         """Select the next packet using Q-learning policy"""
         if not node.queue:
             return None
 
-        state = self._get_state(node)
+        state = self._get_state(node, packet)
         actions = self._get_actions(node)
 
         if not actions:
@@ -111,11 +103,10 @@ class QLearningScheduler(SchedulingAlgorithm):
         else:
             q_values = [self.q_table[state][a] for a in actions]
             max_q = max(q_values)
-            max_indices = [i for i, q in enumerate(q_values) if q == max_q]
-            action_index = random.choice(max_indices)
-            action = actions[action_index]
+            max_actions = [a for q, a in zip(q_values, actions) if q == max_q]
+            action = random.choice(max_actions)
 
-        return node.queue[action]
+        return action
 
     def update_q_table(self, state, action, reward, next_state):
         """Update Q-table using the Q-learning update rule"""
@@ -131,24 +122,24 @@ class QLearningScheduler(SchedulingAlgorithm):
         self.q_table[state][action] = new_q
 
 
-def scheduling_algorithm_factory(
-    scheduler_type: str,
+def router_factory(
+    router_type: str,
     **kwargs
-) -> SchedulingAlgorithm:
+) -> Router:
     """
-    Factory function to create the appropriate scheduler
+    Factory function to create the appropriate router
 
     Args:
-        scheduler_type: Type of the scheduler ("RR", "QL", or other for FIFO)
+        router_type: Type of the router ("RR", "QL", or other for FIFO)
         env: SimPy environment
 
     Returns:
         An instance of the selected scheduling algorithm
     """
-    if scheduler_type == "RR":
-        return RoundRobinScheduler()
-    elif scheduler_type == "QL":
-        return QLearningScheduler()
+    if router_type == "LCF":
+        return LeastCongestionFirstRouter()
+    elif router_type == "QL":
+        return QRouter(kwargs)
     else:
         # Default to FIFO
-        return FIFOScheduler()
+        return DijkstraRouter()

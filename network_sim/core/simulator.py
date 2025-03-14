@@ -14,7 +14,7 @@ from typing import Dict, List, Set, Tuple, Callable, Optional, Any
 from network_sim.core.packet import Packet
 from network_sim.core.link import Link
 from network_sim.core.node import Node
-from network_sim.core.scheduling_algorithms import SchedulingAlgorithm
+from network_sim.core.routing_algorithms import *
 
 
 class NetworkSimulator:
@@ -24,7 +24,7 @@ class NetworkSimulator:
         env: SimPy environment.
         graph: NetworkX directed graph representing the network.
         nodes: Node objects keyed by node ID.
-        links: Link objects keyed by (source, target) tuple.
+        links: Link objects keyed by (source, destination) tuple.
         packets: All packets in the simulation.
         active_packets: Packets currently in transit.
         completed_packets: Packets that reached their destination.
@@ -35,18 +35,18 @@ class NetworkSimulator:
     def __init__(
         self,
         env: simpy.Environment,
-        scheduler_type: str,
+        router_type: str,
         seed: int = 42,
     ):
         """Initialize the network simulator.
 
         Args:
             env: SimPy environment.
-            scheduler_type: The scheduler type that is used.
+            router_type: The router type that is used.
             seed: Random seed for reproducibility.
         """
         self.env = env
-        self.scheduler_type = scheduler_type
+        self.router_type = router_type
         self.graph = nx.DiGraph()
         self.nodes: Dict[int, Node] = {}
         self.links: Dict[Tuple[int, int], Link] = {}
@@ -69,7 +69,7 @@ class NetworkSimulator:
     def add_node(
         self,
         node_id: int,
-        scheduler: Optional[SchedulingAlgorithm] = None,
+        router: Optional[Router] = None,
         buffer_size: float = float("inf"),
     ) -> Node:
         """Add a node to the network.
@@ -81,7 +81,7 @@ class NetworkSimulator:
         Returns:
             The created Node object.
         """
-        node = Node(self.env, node_id, scheduler, buffer_size)
+        node = Node(self.env, node_id, router, buffer_size)
         self.nodes[node_id] = node
         self.graph.add_node(node_id)
         return node
@@ -89,7 +89,7 @@ class NetworkSimulator:
     def add_link(
         self,
         source: int,
-        target: int,
+        destination: int,
         capacity: float,
         propagation_delay: float
     ) -> Tuple[Link,Link]:
@@ -97,7 +97,7 @@ class NetworkSimulator:
 
         Args:
             source: Source node ID.
-            target: Target node ID.
+            destination: Destination node ID.
             capacity: Link capacity in bits per second.
             propagation_delay: Propagation delay in seconds.
             buffer_size: Maximum buffer size in bytes.
@@ -105,23 +105,23 @@ class NetworkSimulator:
         Returns:
             Tuple of created Link objects.
         """
-        if source not in self.nodes or target not in self.nodes:
-            raise ValueError(f"Nodes {source} and/or {target} do not exist")
+        if source not in self.nodes or destination not in self.nodes:
+            raise ValueError(f"Nodes {source} and/or {destination} do not exist")
 
-        linkTo = Link(self.env, source, target, capacity, propagation_delay)
-        linkFrom = Link(self.env, target, source, capacity, propagation_delay)
-        self.links[(source, target)] = linkTo
-        self.links[(target, source)] = linkFrom
-        self.nodes[source].add_link(linkTo)
-        self.nodes[target].add_link(linkFrom)
+        linkTo = Link(self.env, source, destination, capacity, propagation_delay)
+        linkFrom = Link(self.env, destination, source, capacity, propagation_delay)
+        self.links[(source, destination)] = linkTo
+        self.links[(destination, source)] = linkFrom
+        self.nodes[source].add_link(linkTo, self.nodes[destination])
+        self.nodes[destination].add_link(linkFrom, self.nodes[destination])
         self.graph.add_edge(
             source,
-            target,
+            destination,
             capacity=capacity,
             delay=propagation_delay,
         )
         self.graph.add_edge(
-            target,
+            destination,
             source,
             capacity=capacity,
             delay=propagation_delay,
@@ -224,20 +224,16 @@ class NetworkSimulator:
                     self.packet_arrived(packet)
                     return
 
-                next_hop = current_node.get_next_hop(packet.destination)
+                next_hop, routing_delay = current_node.route_packet(packet)
                 if next_hop is None:
                     self.packet_dropped(packet, "No route to destination")
                     return
-
+                
                 link = current_node.links.get(next_hop)
                 if link is None:
-                    self.packet_dropped(packet, "No link to next hop")
-                    return
-
-                packet, scheduling_delay = current_node.get_next_packet(link)
-                if packet == None:
-                    return
-                yield self.env.timeout(scheduling_delay)
+                    raise ValueError("wtf")
+                
+                yield self.env.timeout(routing_delay)
 
             queuing_start = self.env.now
             with link.resource.request() as link_resource:
@@ -265,7 +261,7 @@ class NetworkSimulator:
         packet.arrival_time = self.env.now
         self.active_packet_ids.remove(packet.id)
         self.completed_packets.append(packet)
-        self.nodes[packet.destination].packets_received += 1
+        self.nodes[packet.destination].packet_arrived(packet)
 
     def packet_dropped(self, packet: Packet, reason: str) -> None:
         """Handle packet drop.
@@ -278,7 +274,7 @@ class NetworkSimulator:
         if packet.id in self.active_packet_ids:
             self.active_packet_ids.remove(packet.id)
         self.dropped_packets.append((packet, reason))
-        self.nodes[packet.current_node].packets_dropped += 1
+        self.nodes[packet.current_node].packet_dropped(packet)
 
     def calculate_metrics(
         self, start_time: float = 0, end_time: Optional[float] = None
@@ -316,11 +312,14 @@ class NetworkSimulator:
         )
 
         link_utilization = {}
-        for (source, target), link in self.links.items():
+        for (source, destination), link in self.links.items():
             bits_sent = link.bytes_sent * 8
             max_bits = link.capacity * simulation_time
-            utilization = bits_sent / max_bits if max_bits > 0 else 0
-            link_utilization[(source, target)] = utilization
+            if max_bits == float("inf"):
+                utilization = bits_sent
+            else:
+                utilization = bits_sent / max_bits if max_bits != 0 else 0
+            link_utilization[(source, destination)] = utilization
 
         def average(inputs):
             total = sum(inputs)
@@ -339,12 +338,12 @@ class NetworkSimulator:
         self.metrics["average_delay"] = average_delay
         self.metrics["packet_loss_rate"] = packet_loss_rate
         self.metrics["link_utilization"] = link_utilization
-        self.metrics["scheduler_type"] = self.scheduler_type
+        self.metrics["router_type"] = self.router_type
         self.metrics["queue_lengths"] = queue_lengths
 
         return self.metrics
 
-    def run(self, duration: float) -> Dict[str, Any]:
+    def run(self, duration: float, drop_actives=False) -> Dict[str, Any]:
         """Run the simulation for a specified duration.
 
         Args:
@@ -354,6 +353,14 @@ class NetworkSimulator:
             Dictionary of calculated metrics.
         """
         self.env.run(until=duration)
+        
+        if drop_actives:
+            for packet_id in list(self.active_packet_ids):
+                packet = [p for p in self.packets if p.id == packet_id]
+                if len(packet) != 1:
+                    raise ValueError("wtf")
+                packet = packet[0]
+                self.packet_dropped(packet, "Simulation ended")
 
         self.calculate_metrics()
 

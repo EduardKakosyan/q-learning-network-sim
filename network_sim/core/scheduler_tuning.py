@@ -1,20 +1,20 @@
 """Parameter tuning for scheduling algorithms.
 
 This module provides functionality for automatically tuning the parameters
-of scheduling algorithms, particularly the Q-Learning scheduler.
+of scheduling algorithms, particularly the Q-Learning router.
 """
 
 import random
 from typing import Dict, List, Tuple
 import simpy
 
-from network_sim.core.scheduling_algorithms import QLearningScheduler
+from network_sim.core.routing_algorithms import QLearningRouter
 
 
-class TunedQLearningScheduler(QLearningScheduler):
-    """Q-Learning scheduler with automatic parameter tuning.
+class TunedQLearningRouter(QLearningRouter):
+    """Q-Learning router with automatic parameter tuning.
 
-    This scheduler extends the base QLearningScheduler with the ability to
+    This router extends the base QLearningRouter with the ability to
     automatically tune its parameters based on network conditions.
     """
 
@@ -25,7 +25,7 @@ class TunedQLearningScheduler(QLearningScheduler):
         population_size: int = 5,
         generations: int = 3,
     ):
-        """Initialize the tuned Q-Learning scheduler.
+        """Initialize the tuned Q-Learning router.
 
         Args:
             env: SimPy environment.
@@ -81,7 +81,7 @@ class TunedQLearningScheduler(QLearningScheduler):
                 self.exploration_rate = best_parameters["exploration_rate"]
 
     def _evaluate_performance(self) -> float:
-        """Evaluate the current performance of the scheduler.
+        """Evaluate the current performance of the router.
 
         Returns:
             Performance score (higher is better).
@@ -211,10 +211,10 @@ class TunedQLearningScheduler(QLearningScheduler):
         return super().select_next_packet(queue, link)
 
 
-class RewardBasedQLearningScheduler(QLearningScheduler):
-    """Q-Learning scheduler with a sophisticated reward function.
+class RewardBasedQLearningRouter(QLearningRouter):
+    """Q-Learning router with a sophisticated reward function.
 
-    This scheduler extends the base QLearningScheduler with a more
+    This router extends the base QLearningRouter with a more
     sophisticated reward function that considers multiple network metrics.
     """
 
@@ -225,7 +225,7 @@ class RewardBasedQLearningScheduler(QLearningScheduler):
         discount_factor: float = 0.95,
         exploration_rate: float = 0.15,
     ):
-        """Initialize the reward-based Q-Learning scheduler.
+        """Initialize the reward-based Q-Learning router.
 
         Args:
             env: SimPy environment.

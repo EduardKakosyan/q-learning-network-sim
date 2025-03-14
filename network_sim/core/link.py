@@ -14,7 +14,7 @@ class Link:
     Attributes:
         env: SimPy environment.
         source: Source node ID.
-        target: Target node ID.
+        destination: Destination node ID.
         capacity: Link capacity in bits per second.
         propagation_delay: Propagation delay in seconds.
         bytes_sent: Number of bytes sent through this link.
@@ -25,7 +25,7 @@ class Link:
         self,
         env: simpy.Environment,
         source: int,
-        target: int,
+        destination: int,
         capacity: float,
         propagation_delay: float
     ):
@@ -34,13 +34,13 @@ class Link:
         Args:
             env: SimPy environment.
             source: Source node ID.
-            target: Target node ID.
+            destination: Destination node ID.
             capacity: Link capacity in bits per second.
             propagation_delay: Propagation delay in seconds.
         """
         self.env = env
         self.source = source
-        self.target = target
+        self.destination = destination
         self.capacity = capacity
         self.propagation_delay = propagation_delay
         self.bytes_sent = 0
@@ -75,4 +75,4 @@ class Link:
         Returns:
             String representation of the link.
         """
-        return f"Link({self.source}->{self.target}, {self.capacity/1000000:.1f}Mbps, {self.propagation_delay*1000:.1f}ms)"
+        return f"Link({self.source}->{self.destination}, {self.capacity/1000000:.1f}Mbps, {self.propagation_delay*1000:.1f}ms)"

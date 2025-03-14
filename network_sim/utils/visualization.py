@@ -57,7 +57,7 @@ def save_network_visualization(
         graph, pos, edge_labels=edge_labels, font_size=8
     )
 
-    plt.title(f"Network Topology (Scheduler: {simulator.scheduler_type})")
+    plt.title(f"Network Topology (Router: {simulator.router_type})")
     plt.axis("off")
     plt.tight_layout()
 
@@ -68,14 +68,14 @@ def save_network_visualization(
 
 def plot_metrics(
     metrics_list: List[Dict[str, Any]],
-    scheduler_types: List[str],
+    router_types: List[str],
     output_dir: str = "results",
 ) -> None:
-    """Plot and save performance metrics for different schedulers.
+    """Plot and save performance metrics for different routers.
 
     Args:
         metrics_list: List of metrics dictionaries from different simulations.
-        scheduler_types: List of scheduler types corresponding to metrics_list.
+        router_types: List of router types corresponding to metrics_list.
         output_dir: Directory to save output plots.
     """
     os.makedirs(output_dir, exist_ok=True)
@@ -83,30 +83,30 @@ def plot_metrics(
     # Throughput comparison
     plt.figure(figsize=(10, 6))
     throughputs = [m["throughput"] for m in metrics_list]
-    plt.bar(scheduler_types, throughputs)
+    plt.bar(router_types, throughputs)
     plt.title("Throughput Comparison")
     plt.ylabel("Throughput (bytes/second)")
-    plt.xlabel("Scheduler Type")
+    plt.xlabel("Router Type")
     plt.savefig(f"{output_dir}/throughput_comparison.png")
     plt.close()
 
     # Delay comparison
     plt.figure(figsize=(10, 6))
     delays = [m["average_delay"] for m in metrics_list]
-    plt.bar(scheduler_types, delays)
+    plt.bar(router_types, delays)
     plt.title("Average Delay Comparison")
     plt.ylabel("Average Delay (seconds)")
-    plt.xlabel("Scheduler Type")
+    plt.xlabel("Router Type")
     plt.savefig(f"{output_dir}/delay_comparison.png")
     plt.close()
 
     # Packet loss rate comparison
     plt.figure(figsize=(10, 6))
     loss_rates = [m["packet_loss_rate"] for m in metrics_list]
-    plt.bar(scheduler_types, loss_rates)
+    plt.bar(router_types, loss_rates)
     plt.title("Packet Loss Rate Comparison")
     plt.ylabel("Packet Loss Rate")
-    plt.xlabel("Scheduler Type")
+    plt.xlabel("Router Type")
     plt.savefig(f"{output_dir}/loss_rate_comparison.png")
     plt.close()
 
@@ -129,7 +129,7 @@ def plot_link_utilization(
 
     plt.figure(figsize=(12, 6))
     plt.bar(links, utilizations)
-    plt.title(f"Link Utilization (Scheduler: {simulator.scheduler_type})")
+    plt.title(f"Link Utilization (Router: {simulator.router_type})")
     plt.ylabel("Utilization")
     plt.xlabel("Link")
     plt.xticks(rotation=45)
