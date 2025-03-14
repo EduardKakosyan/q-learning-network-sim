@@ -9,6 +9,7 @@ import os
 import simpy
 
 from network_sim.core.simulator import NetworkSimulator
+from network_sim.core.scheduling_algorithms import scheduling_algorithm_factory
 from network_sim.core.enums import TrafficPattern
 from network_sim.traffic.generators import (
     constant_traffic,
@@ -20,16 +21,14 @@ from network_sim.utils.visualization import (
     save_network_visualization,
     plot_metrics,
     plot_link_utilization,
-    plot_packet_journey,
 )
 from network_sim.utils.metrics import (
-    save_metrics_to_json,
     compare_schedulers,
     calculate_fairness_index,
 )
 
 
-def create_dumbbell_topology(simulator):
+def create_dumbbell_topology(simulator: NetworkSimulator):
     """Create a dumbbell network topology.
 
     Args:
@@ -65,7 +64,8 @@ def run_simulation(scheduler_type, duration=10.0):
         NetworkSimulator instance after simulation.
     """
     env = simpy.Environment()
-    simulator = NetworkSimulator(env=env, scheduler_type=scheduler_type)
+    scheduler = scheduling_algorithm_factory(scheduler_type, env)
+    simulator = NetworkSimulator(env, scheduler)
 
     source_nodes, dest_nodes = create_dumbbell_topology(simulator)
 
@@ -101,26 +101,18 @@ def main():
     for scheduler in schedulers:
         print(f"Running simulation with {scheduler} scheduler...")
         simulator = run_simulation(scheduler)
+        save_network_visualization(simulator, "results/topology.png")
         simulators.append(simulator)
         metrics_list.append(simulator.metrics)
 
-        save_network_visualization(
-            simulator, f"results/{scheduler.lower()}_topology.png"
-        )
         plot_link_utilization(
             simulator, f"results/{scheduler.lower()}_link_utilization.png"
-        )
-        plot_packet_journey(
-            simulator, output_file=f"results/{scheduler.lower()}_packet_journey.png"
-        )
-        save_metrics_to_json(
-            simulator.metrics, f"results/{scheduler.lower()}_metrics.json"
         )
 
         fairness = calculate_fairness_index(simulator)
         print(f"  Fairness index: {fairness:.4f}")
 
-    comparison = compare_schedulers(simulators)
+    compare_schedulers(simulators)
 
     plot_metrics(metrics_list, schedulers)
 

@@ -5,8 +5,7 @@ of scheduling algorithms, particularly the Q-Learning scheduler.
 """
 
 import random
-import numpy as np
-from typing import Dict, List, Tuple, Any, Optional
+from typing import Dict, List, Tuple
 import simpy
 
 from network_sim.core.scheduling_algorithms import QLearningScheduler

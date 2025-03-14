@@ -92,7 +92,7 @@ def plot_link_utilization(
 
     plt.figure(figsize=(12, 6))
     plt.bar(links, utilizations)
-    plt.title(f"Link Utilization (Scheduler: {simulator.scheduler_type})")
+    plt.title(f"Link Utilization (Scheduler: {simulator.scheduler.name})")
     plt.ylabel("Utilization")
     plt.xlabel("Link")
     plt.xticks(rotation=45)
