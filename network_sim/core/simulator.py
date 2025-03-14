@@ -8,7 +8,6 @@ import simpy
 import networkx as nx
 import random
 import numpy as np
-import pydot # This import is just to show that it is being used by the project.
 import matplotlib.pyplot as plt
 from collections import defaultdict
 from typing import Dict, List, Set, Tuple, Callable, Optional, Any, Union
@@ -371,52 +370,3 @@ class NetworkSimulator:
         self.calculate_metrics()
 
         return self.metrics
-
-    def visualize_network(self, figsize: Tuple[int, int] = (10, 8)) -> plt.Figure:
-        """Visualize the network topology.
-
-        Args:
-            figsize: Figure size as (width, height) in inches.
-
-        Returns:
-            Matplotlib figure object.
-        """
-        fig = plt.figure(figsize=figsize)
-
-        pos = nx.nx_pydot.graphviz_layout(self.graph)
-
-        nx.draw_networkx_nodes(self.graph, pos, node_size=500, node_color="lightblue")
-
-        edge_capacities = [
-            self.graph[u][v]["capacity"] / 1000000 for u, v in self.graph.edges()
-        ]
-        max_capacity = max(edge_capacities) if edge_capacities else 1
-        edge_widths = [cap / max_capacity * 3 for cap in edge_capacities]
-
-        nx.draw_networkx_edges(
-            self.graph,
-            pos,
-            width=edge_widths,
-            alpha=0.7,
-            edge_color="gray",
-            arrows=True,
-            arrowsize=15,
-        )
-
-        nx.draw_networkx_labels(self.graph, pos, font_size=12)
-
-        edge_labels = {
-            (
-                u,
-                v,
-            ): f"{self.graph[u][v]['capacity']/1000000:.1f}Mbps\n{self.graph[u][v]['delay']*1000:.1f}ms"
-            for u, v in self.graph.edges()
-        }
-        nx.draw_networkx_edge_labels(
-            self.graph, pos, edge_labels=edge_labels, font_size=8
-        )
-
-        plt.title(f"Network Topology (Scheduler: {self.scheduler.name})")
-        plt.axis("off")
-        plt.tight_layout()
-        return fig

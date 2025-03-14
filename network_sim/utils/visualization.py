@@ -4,10 +4,12 @@ This module provides functions for visualizing network simulation results,
 including network topology, traffic patterns, and performance metrics.
 """
 
-import os
-import matplotlib.pyplot as plt
-import numpy as np
 from typing import Dict, Any, List, Tuple, Optional
+import matplotlib.pyplot as plt
+import networkx as nx
+import numpy as np
+import os
+import pydot # This import is just to show that it is being used by the project.
 
 from network_sim.core.simulator import NetworkSimulator
 
@@ -22,11 +24,46 @@ def save_network_visualization(
         filename: Output filename.
         figsize: Figure size as (width, height) in inches.
     """
-    plt_figure = simulator.visualize_network(figsize)
+    fig = plt.figure(figsize=figsize)
+
+    graph = simulator.graph
+    pos = nx.nx_pydot.graphviz_layout(graph)
+
+    nx.draw_networkx_nodes(graph, pos, node_size=500, node_color="lightblue")
+
+    edge_capacities = [
+        graph[u][v]["capacity"] / 1000000 for u, v in graph.edges()
+    ]
+    max_capacity = max(edge_capacities) if edge_capacities else 1
+    edge_widths = [cap / max_capacity * 3 for cap in edge_capacities]
+
+    nx.draw_networkx_edges(
+        graph,
+        pos,
+        width=edge_widths,
+        alpha=0.7,
+        edge_color="gray",
+        arrows=True,
+        arrowsize=15,
+    )
+
+    nx.draw_networkx_labels(graph, pos, font_size=12)
+
+    edge_labels = {
+        (u, v): f"{graph[u][v]['capacity']/1000000:.1f}Mbps\n{graph[u][v]['delay']*1000:.1f}ms"
+        for u, v in graph.edges()
+    }
+    nx.draw_networkx_edge_labels(
+        graph, pos, edge_labels=edge_labels, font_size=8
+    )
+
+    plt.title(f"Network Topology (Scheduler: {simulator.scheduler.name})")
+    plt.axis("off")
+    plt.tight_layout()
 
     os.makedirs(os.path.dirname(filename), exist_ok=True)
-    plt_figure.savefig(filename)
-    plt.close(plt_figure)
+    fig.savefig(filename)
+    plt.close(fig)
 
 
 def plot_metrics(
