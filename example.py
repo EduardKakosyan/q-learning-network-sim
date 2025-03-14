@@ -10,10 +10,10 @@ import simpy
 
 from network_sim.core.simulator import NetworkSimulator
 from network_sim.core.scheduling_algorithms import scheduling_algorithm_factory
-from network_sim.core.enums import TrafficPattern
 from network_sim.traffic.generators import (
     constant_traffic,
     poisson_traffic,
+    bursty_traffic,
     constant_size,
     variable_size,
 )
@@ -28,7 +28,7 @@ from network_sim.utils.metrics import (
 )
 
 
-def run_simulation(scheduler_type, duration=10.0):
+def run_simulation(scheduler_type, duration=30.0):
     """Run a network simulation with the specified scheduler.
 
     Args:
@@ -58,16 +58,14 @@ def run_simulation(scheduler_type, duration=10.0):
         source=1,
         destination=4,
         packet_size=constant_size(1000),
-        interval=constant_traffic(100),
-        pattern=TrafficPattern.CONSTANT,
+        interval=bursty_traffic(40, 0.005),
     )
 
     simulator.packet_generator(
         source=2,
         destination=4,
-        packet_size=variable_size(500, 1500),
-        interval=poisson_traffic(80),
-        pattern=TrafficPattern.VARIABLE,
+        packet_size=constant_size(1000),
+        interval=bursty_traffic(20, 0.0025),
     )
 
     simulator.run(duration)
