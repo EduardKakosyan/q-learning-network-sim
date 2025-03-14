@@ -30,13 +30,14 @@ def run_simulation(router_type, duration=30.0):
     simulator = NetworkSimulator(env, router_type)
 
     router_func = lambda: router_factory(router_type)
-    simulator.add_node(1)
-    simulator.add_node(2)
-    simulator.add_node(3, router=router_func())
-    simulator.add_node(4)
+    simulator.add_node(1, router=router_func(), buffer_size=1e6)
+    simulator.add_node(2, buffer_size=1e6)
+    simulator.add_node(3, buffer_size=1e6)
+    simulator.add_node(4, buffer_size=1e6)
 
+    simulator.add_link(1, 2, float("inf"), 0.01)
+    simulator.add_link(2, 4, float("inf"), 0.01)
     simulator.add_link(1, 3, float("inf"), 0.01)
-    simulator.add_link(2, 3, float("inf"), 0.01)
     simulator.add_link(3, 4, float("inf"), 0.01)
 
     simulator.compute_shortest_paths()
@@ -44,15 +45,8 @@ def run_simulation(router_type, duration=30.0):
     simulator.packet_generator(
         source=1,
         destination=4,
-        packet_size=constant_size(1000),
-        interval=constant_traffic(10),
-    )
-
-    simulator.packet_generator(
-        source=2,
-        destination=4,
-        packet_size=constant_size(1000),
-        interval=constant_traffic(10),
+        packet_size=variable_size(100, 1000),
+        interval=constant_traffic(2000),
     )
 
     simulator.run(duration)
