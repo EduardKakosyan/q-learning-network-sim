@@ -31,16 +31,9 @@ def save_network_visualization(
 
     nx.draw_networkx_nodes(graph, pos, node_size=500, node_color="lightblue")
 
-    edge_capacities = [
-        graph[u][v]["capacity"] / 1000000 for u, v in graph.edges()
-    ]
-    max_capacity = max(edge_capacities) if edge_capacities else 1
-    edge_widths = [cap / max_capacity * 3 for cap in edge_capacities]
-
     nx.draw_networkx_edges(
         graph,
         pos,
-        width=edge_widths,
         alpha=0.7,
         edge_color="gray",
         arrows=True,

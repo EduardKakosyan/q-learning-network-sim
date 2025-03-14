@@ -218,7 +218,6 @@ class NetworkSimulator:
             with current_node.resource.request() as node_resource:
                 yield node_resource
                 queuing_delay = self.env.now - queuing_start
-                packet.record_queuing_delay(queuing_delay)
 
                 if packet.current_node == packet.destination:
                     self.packet_arrived(packet)
@@ -234,15 +233,18 @@ class NetworkSimulator:
                     raise ValueError("wtf")
                 
                 yield self.env.timeout(routing_delay)
+                
+                routing_delay += queuing_delay
 
-            queuing_start = self.env.now
-            with link.resource.request() as link_resource:
-                yield link_resource
-                queuing_delay = self.env.now - queuing_start
-                packet.record_queuing_delay(queuing_delay)
+                queuing_start = self.env.now
+                with link.resource.request() as link_resource:
+                    yield link_resource
+                    queuing_delay = self.env.now - queuing_start
+                    queuing_delay += routing_delay
+                    packet.record_queuing_delay(queuing_delay)
 
-                transmission_delay = link.calculate_transmission_delay(packet.size)
-                yield self.env.timeout(transmission_delay)
+                    transmission_delay = link.calculate_transmission_delay(packet.size)
+                    yield self.env.timeout(transmission_delay)
         
             yield self.env.timeout(link.propagation_delay)
             link.bytes_sent += packet.size
