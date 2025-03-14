@@ -92,8 +92,8 @@ class NetworkSimulator:
         target: int,
         capacity: float,
         propagation_delay: float
-    ) -> Link:
-        """Add a link between nodes.
+    ) -> Tuple[Link,Link]:
+        """Add a BIDIRECTIONAL link between nodes.
 
         Args:
             source: Source node ID.
@@ -103,21 +103,30 @@ class NetworkSimulator:
             buffer_size: Maximum buffer size in bytes.
 
         Returns:
-            The created Link object.
+            Tuple of created Link objects.
         """
         if source not in self.nodes or target not in self.nodes:
             raise ValueError(f"Nodes {source} and/or {target} do not exist")
 
-        link = Link(self.env, source, target, capacity, propagation_delay)
-        self.links[(source, target)] = link
-        self.nodes[source].add_link(link)
+        linkTo = Link(self.env, source, target, capacity, propagation_delay)
+        linkFrom = Link(self.env, target, source, capacity, propagation_delay)
+        self.links[(source, target)] = linkTo
+        self.links[(target, source)] = linkFrom
+        self.nodes[source].add_link(linkTo)
+        self.nodes[target].add_link(linkFrom)
         self.graph.add_edge(
             source,
             target,
             capacity=capacity,
             delay=propagation_delay,
         )
-        return link
+        self.graph.add_edge(
+            target,
+            source,
+            capacity=capacity,
+            delay=propagation_delay,
+        )
+        return Tuple[Link,Link]
 
     def compute_shortest_paths(self) -> None:
         """Compute shortest paths and set routing tables for all nodes."""
