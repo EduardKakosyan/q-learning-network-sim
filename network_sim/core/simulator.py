@@ -51,7 +51,7 @@ class NetworkSimulator:
         self.nodes: Dict[int, Node] = {}
         self.links: Dict[Tuple[int, int], Link] = {}
         self.packets: List[Packet] = []
-        self.active_packets: Set[int] = set()
+        self.active_packet_ids: Set[int] = set()
         self.completed_packets: List[Packet] = []
         self.dropped_packets: List[Tuple[Packet, str]] = []
 
@@ -63,7 +63,7 @@ class NetworkSimulator:
             "average_delay": 0,
             "packet_loss_rate": 0,
             "link_utilization": defaultdict(float),
-            "queue_lengths": defaultdict(list),
+            "queue_lengths": defaultdict(float),
         }
 
     def add_node(
@@ -143,7 +143,7 @@ class NetworkSimulator:
         """
         packet = Packet(source, destination, size, self.env.now)
         self.packets.append(packet)
-        self.active_packets.add(packet.id)
+        self.active_packet_ids.add(packet.id)
         return packet
 
     def packet_generator(
@@ -254,7 +254,7 @@ class NetworkSimulator:
             packet: The packet that arrived.
         """
         packet.arrival_time = self.env.now
-        self.active_packets.remove(packet.id)
+        self.active_packet_ids.remove(packet.id)
         self.completed_packets.append(packet)
         self.nodes[packet.destination].packets_received += 1
 
@@ -266,8 +266,8 @@ class NetworkSimulator:
             reason: Reason for dropping the packet.
         """
         packet.dropped = True
-        if packet.id in self.active_packets:
-            self.active_packets.remove(packet.id)
+        if packet.id in self.active_packet_ids:
+            self.active_packet_ids.remove(packet.id)
         self.dropped_packets.append((packet, reason))
         self.nodes[packet.current_node].packets_dropped += 1
 
@@ -298,11 +298,7 @@ class NetworkSimulator:
         )
         throughput = total_bytes / simulation_time
 
-        delays = [
-            p.get_total_delay()
-            for p in self.completed_packets
-            if start_time <= p.arrival_time <= end_time
-        ]
+        delays = [p.get_total_delay() for p in self.completed_packets]
         average_delay = sum(delays) / len(delays) if delays else 0
 
         total_packets = len(self.completed_packets) + len(self.dropped_packets)
@@ -317,11 +313,25 @@ class NetworkSimulator:
             utilization = bits_sent / max_bits if max_bits > 0 else 0
             link_utilization[(source, target)] = utilization
 
+        def average(inputs):
+            total = sum(inputs)
+            if total == 0:
+                return total
+            return total / len(inputs)
+
+        dropped_queues = [sum(p.queuing_delays) for p, _ in self.dropped_packets]
+        completed_queues = [sum(p.queuing_delays) for p in self.completed_packets]
+        queue_lengths = {
+            'dropped': average(dropped_queues),
+            'arrived': average(completed_queues)
+        }
+
         self.metrics["throughput"] = throughput
         self.metrics["average_delay"] = average_delay
         self.metrics["packet_loss_rate"] = packet_loss_rate
         self.metrics["link_utilization"] = link_utilization
         self.metrics["scheduler_type"] = self.scheduler_type
+        self.metrics["queue_lengths"] = queue_lengths
 
         return self.metrics
 
