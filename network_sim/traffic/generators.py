@@ -6,7 +6,7 @@ including constant, variable, Poisson, and Pareto traffic patterns.
 
 import random
 import numpy as np
-from typing import Callable
+from typing import Callable, Union
 
 
 def constant_traffic(rate: float) -> Callable[[], float]:
@@ -59,8 +59,53 @@ def pareto_traffic(rate: float, alpha: float = 1.5) -> Callable[[], float]:
     scale = (alpha - 1) / (alpha * rate)
     return lambda: np.random.pareto(alpha) * scale
 
+def bursty_traffic(size: int, rate: Union[float, Callable[[], float]]) -> Callable[[], float]:
+    """Generate bursty traffic
+
+    Args:
+    size: Number of packets in a burst (for BURSTY pattern).
+    rate: Rate of generation between packets in a burst (for BURSTY pattern).
+            OR a function that returns such an interval
+
+    Returns:
+        Function that returns intervals between packets, creating a bursty pattern
+    """
+
+    # convert float to funct if given float
+    if callable(rate):
+        rate_funct = rate
+    else:
+        rate_funct = lambda: rate
+
+    # state tracking for bursts
+    in_burst = False
+    packets = 0
+
+    def next_interval():
+        nonlocal in_burst, packets
+
+        current_rate = rate_funct()
+
+        if not in_burst:
+            # start new burst
+            in_burst = True
+            packets = 1
+            return 0
+        
+        if packets < size:
+            # within burst
+            packets+=1
+            return current_rate
+        else: 
+            # next call will start new burst
+            in_burst = False
+            packets = 0
+            return current_rate * size
+
+    return next_interval
 
 def constant_size(size: int) -> Callable[[], int]:
+
     """Generate constant size packets.
 
     Args:

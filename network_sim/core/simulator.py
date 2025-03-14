@@ -14,7 +14,6 @@ from typing import Dict, List, Set, Tuple, Callable, Optional, Any
 from network_sim.core.packet import Packet
 from network_sim.core.link import Link
 from network_sim.core.node import Node
-from network_sim.core.enums import TrafficPattern
 from network_sim.core.scheduling_algorithms import SchedulingAlgorithm
 
 
@@ -154,7 +153,6 @@ class NetworkSimulator:
         packet_size: Callable[[], int],
         interval: Callable[[], float],
         jitter: float = 0,
-        pattern: TrafficPattern = TrafficPattern.CONSTANT,
         burst_size: int = 1,
         burst_interval: Optional[float] = None,
     ) -> simpy.events.Process:
@@ -165,10 +163,7 @@ class NetworkSimulator:
             destination: Destination node ID.
             packet_size: Size of packets in bytes.
             interval: Time between packets/bursts in seconds.
-            jitter: Random variation in interval (fraction of interval).
-            pattern: Traffic pattern (CONSTANT, VARIABLE, BURSTY, MIXED).
-            burst_size: Number of packets in a burst (for BURSTY pattern).
-            burst_interval: Time between packets in a burst (for BURSTY pattern).
+            jitter: Random variation in interval (fraction of interval).            
 
         Returns:
             SimPy process for the packet generator.
@@ -181,20 +176,10 @@ class NetworkSimulator:
                 if jitter > 0:
                     current_interval *= 1 + random.uniform(-jitter, jitter)
 
-                if pattern == TrafficPattern.BURSTY:
-                    for i in range(burst_size):
-                        size = packet_size()
-                        packet = self.create_packet(source, destination, size)
+                size = packet_size()
+                packet = self.create_packet(source, destination, size)
 
-                        self.env.process(self.process_packet(packet))
-
-                        if i < burst_size - 1 and burst_interval is not None:
-                            yield self.env.timeout(burst_interval)
-                else:
-                    size = packet_size()
-                    packet = self.create_packet(source, destination, size)
-
-                    self.env.process(self.process_packet(packet))
+                self.env.process(self.process_packet(packet))
 
                 yield self.env.timeout(current_interval)
 
