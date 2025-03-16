@@ -59,53 +59,56 @@ def pareto_traffic(rate: float, alpha: float = 1.5) -> Callable[[], float]:
     scale = (alpha - 1) / (alpha * rate)
     return lambda: np.random.pareto(alpha) * scale
 
-def bursty_traffic(size: int, rate: Union[float, Callable[[], float]]) -> Callable[[], float]:
-    """Generate bursty traffic
+
+def bursty_traffic(
+    burst_size: int, packet_interval: Union[float, Callable[[], float]]
+) -> Callable[[], float]:
+    """Generate bursty network traffic pattern.
+
+    Creates traffic that comes in bursts of packets followed by quiet periods.
+    Each burst contains a fixed number of packets sent at regular intervals,
+    followed by a longer gap before the next burst starts.
 
     Args:
-    size: Number of packets in a burst (for BURSTY pattern).
-    rate: Rate of generation between packets in a burst (for BURSTY pattern).
-            OR a function that returns such an interval
+        burst_size: Number of packets to send in each burst
+        packet_interval: Time between packets within a burst, either as:
+            - Fixed float value in seconds
+            - Callable that returns variable intervals
 
     Returns:
-        Function that returns intervals between packets, creating a bursty pattern
+        Function that returns the time interval until the next packet should be sent:
+        - Returns 0 for first packet in burst (send immediately)
+        - Returns packet_interval for subsequent packets in burst
+        - Returns packet_interval * burst_size for gap between bursts
     """
+    get_interval = (
+        packet_interval if callable(packet_interval) else lambda: packet_interval
+    )
 
-    # convert float to funct if given float
-    if callable(rate):
-        rate_funct = rate
-    else:
-        rate_funct = lambda: rate
+    packets_remaining = 0
 
-    # state tracking for bursts
-    in_burst = False
-    packets = 0
+    def next_packet_delay() -> float:
+        nonlocal packets_remaining
+        interval = get_interval()
 
-    def next_interval():
-        nonlocal in_burst, packets
+        # Start of new burst
+        if packets_remaining == 0:
+            packets_remaining = burst_size - 1  # -1 since we're sending first packet
+            return 0.0
 
-        current_rate = rate_funct()
+        # Middle of burst
+        if packets_remaining > 0:
+            packets_remaining -= 1
+            return interval
 
-        if not in_burst:
-            # start new burst
-            in_burst = True
-            packets = 1
-            return 0
-        
-        if packets < size:
-            # within burst
-            packets+=1
-            return current_rate
-        else: 
-            # next call will start new burst
-            in_burst = False
-            packets = 0
-            return current_rate * size
+        # End of burst - add delay before next burst
+        packets_remaining = 0
+        return interval * burst_size
 
-    return next_interval
+    return next_packet_delay
+
 
 def constant_size(size: int) -> Callable[[], int]:
-
     """Generate constant size packets.
 
     Args:

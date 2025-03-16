@@ -14,7 +14,7 @@ from typing import Dict, List, Set, Tuple, Callable, Optional, Any
 from network_sim.core.packet import Packet
 from network_sim.core.link import Link
 from network_sim.core.node import Node
-from network_sim.core.routing_algorithms import *
+from network_sim.core.routing_algorithms import Router
 
 
 class NetworkSimulator:
