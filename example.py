@@ -10,10 +10,18 @@ import os
 import simpy
 
 from network_sim.core.simulator import NetworkSimulator
-from network_sim.core.routing_algorithms import *
-from network_sim.traffic.generators import *
-from network_sim.utils.visualization import *
-from network_sim.utils.metrics import *
+from network_sim.core.routing_algorithms import router_factory
+from network_sim.traffic.generators import constant_traffic, constant_size
+from network_sim.utils.visualization import (
+    save_network_visualization,
+    plot_metrics,
+    plot_link_utilization,
+)
+from network_sim.utils.metrics import (
+    save_metrics_to_json,
+    compare_routers,
+    calculate_fairness_index,
+)
 
 
 def run_simulation(router_type, duration=30.0):
@@ -29,10 +37,12 @@ def run_simulation(router_type, duration=30.0):
     env = simpy.Environment()
     simulator = NetworkSimulator(env, router_type)
 
-    router_func = lambda: router_factory(router_type)
-    simulator.add_node(1, router=router_func(), buffer_size=1e6)
-    simulator.add_node(2, router=router_func(), buffer_size=1e6)
-    simulator.add_node(3, router=router_func(), buffer_size=1e6)
+    def create_router():
+        return router_factory(router_type)
+
+    simulator.add_node(1, router=create_router(), buffer_size=1e6)
+    simulator.add_node(2, router=create_router(), buffer_size=1e6)
+    simulator.add_node(3, router=create_router(), buffer_size=1e6)
     simulator.add_node(4, buffer_size=1e6)
 
     simulator.add_link(1, 2, 8e6, 0.01)
@@ -70,9 +80,7 @@ def main():
         simulators.append(simulator)
         metrics_list.append(simulator.metrics)
 
-        save_metrics_to_json(
-            simulator.metrics, f"results/{router.lower()}_metrics.png"
-        )
+        save_metrics_to_json(simulator.metrics, f"results/{router.lower()}_metrics.png")
         plot_link_utilization(
             simulator, f"results/{router.lower()}_link_utilization.png"
         )
