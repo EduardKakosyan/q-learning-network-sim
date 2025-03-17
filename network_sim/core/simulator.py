@@ -66,6 +66,12 @@ class NetworkSimulator:
             "queue_lengths": defaultdict(float),
         }
 
+        self.hooks: Dict[str, List[Callable[..., Any]]] = {
+            'packet_hop': [],       # packet moves between nodes
+            'packet_arrived': [],   # packet reaches destination
+            'packet_dropped': [],   # packet dropped
+        }
+
     def add_node(
         self,
         node_id: int,
@@ -250,6 +256,7 @@ class NetworkSimulator:
             link.bytes_sent += packet.size
 
             packet.record_hop(next_hop, self.env.now)
+            self.call_hooks('packet_hop', packet, packet.current_node, next_hop, self.env.now)
             self.env.process(self.process_packet(packet))
         
         return packet_journey(packet)
@@ -264,6 +271,7 @@ class NetworkSimulator:
         self.active_packet_ids.remove(packet.id)
         self.completed_packets.append(packet)
         self.nodes[packet.destination].packet_arrived(packet)
+        self.call_hooks('packet_arrived', packet, self.nodes[packet.destination], self.env.now)
 
     def packet_dropped(self, packet: Packet, reason: str) -> None:
         """Handle packet drop.
@@ -277,6 +285,7 @@ class NetworkSimulator:
             self.active_packet_ids.remove(packet.id)
         self.dropped_packets.append((packet, reason))
         self.nodes[packet.current_node].packet_dropped(packet)
+        self.call_hooks('packet_dropped', packet, self.nodes[packet.current_node], reason, self.env.now)
 
     def calculate_metrics(
         self, start_time: float = 0, end_time: Optional[float] = None
@@ -344,6 +353,28 @@ class NetworkSimulator:
         self.metrics["queue_lengths"] = queue_lengths
 
         return self.metrics
+
+    def register_hook(self, event_type: str, callback: Callable[..., Any]) -> None:
+        """Register a callback function for a specific event type.
+        
+        Args:
+            event_type: The type of event to register for.
+            callback: The function to call when the event occurs.
+        """
+        if event_type not in self.hooks:
+            raise ValueError(f"Unknown hook type: {event_type}")
+        self.hooks[event_type].append(callback)
+
+    def call_hooks(self, event_type: str, *args: Any, **kwargs: Any) -> None:
+        """Call all registered callbacks for the given event type.
+        
+        Args:
+            event_type: The type of event that occurred.
+            *args, **kwargs: Arguments to pass to the callback functions.
+        """
+        if event_type in self.hooks:
+            for callback in self.hooks[event_type]:
+                callback(*args, **kwargs)
 
     def run(self, duration: float, drop_actives=False) -> Dict[str, Any]:
         """Run the simulation for a specified duration.

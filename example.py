@@ -38,7 +38,7 @@ def run_simulation(router_type, duration=30.0):
     simulator = NetworkSimulator(env, router_type)
 
     def create_router():
-        return router_factory(router_type)
+        return router_factory(router_type, simulator=simulator)
 
     simulator.add_node(1, router=create_router(), buffer_size=1e6)
     simulator.add_node(2, router=create_router(), buffer_size=1e6)
