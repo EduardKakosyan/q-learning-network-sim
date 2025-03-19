@@ -245,6 +245,10 @@ class NetworkSimulator:
                 queuing_start = self.env.now
                 with link.resource.request() as link_resource:
                     yield link_resource
+                    
+                    # Release the node_resource early once we are "sending" the packet
+                    current_node.resource.release(node_resource)
+                    
                     queuing_delay = self.env.now - queuing_start
                     queuing_delay += routing_delay
                     packet.record_queuing_delay(queuing_delay)

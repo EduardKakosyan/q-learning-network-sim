@@ -3,6 +3,7 @@ from collections import defaultdict
 from typing import Any, List, Tuple, Dict
 from network_sim.core.packet import Packet
 import random
+import numpy as np
 
 
 class Router(ABC):
@@ -68,12 +69,15 @@ class LeastCongestionFirstRouter(Router):
 class QRouter(Router):
     """Q-Learning based scheduling algorithm"""
 
-    def __init__(self, simulator, learning_rate=0.1, discount_factor=0.9, exploration_rate=0.1):
+    def __init__(self, simulator, learning_rate=0.1, discount_factor=0.9, exploration_rate=0.1, bins=4, bin_base=10):
         self.name = "Q-Router"
         self.learning_rate = learning_rate
         self.discount_factor = discount_factor
         self.exploration_rate = exploration_rate
+        self.bins = bins
+        self.bin_base = bin_base
         self.q_table = defaultdict(lambda: defaultdict(float))
+        print(self._bins)
         
         # State-action pair tracking for packets w timestamps
         # {packet_id: (state, action, timestamp)}
@@ -84,14 +88,26 @@ class QRouter(Router):
         simulator.register_hook('packet_arrived', self.on_packet_arrived)
         simulator.register_hook('packet_dropped', self.on_packet_dropped)
 
-    def _get_state(self, node, packet: Packet) -> Tuple[int, int, Any]:
+    @property
+    def _bins(self):
+        return [(float(x) - 1) / (self.bin_base - 1) for x in np.logspace(0, 1, self.bins + 1, base=self.bin_base)][1:]
+
+    def _usage_to_bin(self, usage: float)->int:
+        for i, divider in enumerate(self._bins):
+            if usage <= divider:
+                return i
+        return self.bins
+
+    def _get_state(self, node, packet: Packet) -> Tuple[int, int, Tuple[int, ...]]:
         """Get the current state representation"""
         
-        buffer_usages = tuple(
+        buffer_usages = [
             neighbour.buffer_usage() for _, neighbour in node.neighbours.items()
-        )
+        ]
+        
+        bins = tuple(self._usage_to_bin(usage) for usage in buffer_usages)
 
-        state = (packet.source, packet.destination, node.id, buffer_usages)
+        state = (packet.source, packet.destination, bins)
         return state
 
     def _get_actions(self, node) -> List[int]:

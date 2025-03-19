@@ -41,13 +41,12 @@ def run_simulation(router_type, duration=30.0):
         return router_factory(router_type, simulator=simulator)
 
     simulator.add_node(1, router=create_router(), buffer_size=1e6)
-    simulator.add_node(2, router=create_router(), buffer_size=1e6)
-    simulator.add_node(3, router=create_router(), buffer_size=1e6)
+    simulator.add_node(2, buffer_size=1e6)
+    simulator.add_node(3, buffer_size=1e6)
     simulator.add_node(4, buffer_size=1e6)
 
     simulator.add_link(1, 2, 8e6, 0.01)
     simulator.add_link(1, 3, 8e6, 0.01)
-    simulator.add_link(2, 3, 8e6, 0.01)
     simulator.add_link(2, 4, 8e6, 0.01)
     simulator.add_link(3, 4, 8e6, 0.01)
 
@@ -89,7 +88,7 @@ def main():
         print(f"  Fairness index: {fairness:.4f}")
         print("Number of packets:", len(simulator.packets))
         if simulator.dropped_packets:
-            counter = Counter([reason for _, reason in simulator.dropped_packets])
+            counter = Counter([f"{packet.current_node}: {reason}" for packet, reason in simulator.dropped_packets])
             print(counter)
 
     compare_routers(simulators)
