@@ -65,7 +65,7 @@ class Node:
             link: The link to add.
         """
         if link.source != self.id or link.destination == self.id:
-            raise ValueError("wtf")
+            raise ValueError("Who assigns a link to a node that isn't connected to the node?")
         self.links[link.destination] = link
         self.neighbours[link.destination] = node
 

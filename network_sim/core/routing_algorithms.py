@@ -48,7 +48,7 @@ class DijkstraRouter(Router):
     def route_packet(self, packet):
         """Select the next packet using FIFO policy"""
         if not self.node.queue:
-            raise ValueError("Wtf")
+            raise ValueError("Who schedules packets with an empty buffer?")
         next_hop = self.node.routing_table[packet.destination]
         return next_hop
 
@@ -67,7 +67,7 @@ class LeastCongestionFirstRouter(Router):
         
         min_ids = [id for id, neighbour in self.node.neighbours.items() if smallest_buffer_usage == neighbour.buffer_usage()]    
         if not min_ids:
-            raise ValueError("wtf")
+            raise ValueError("Who turned off the wifi?")
         
         action = random.choice(min_ids)
         
@@ -85,16 +85,16 @@ class QRouter(Router):
         self.exploration_rate = exploration_rate
         self.bins = [(float(x) - 1) / (bin_base - 1) for x in np.logspace(0, 1, bins + 1, base=bin_base)][1:]
         self.q_table = defaultdict(lambda: defaultdict(float))
-        print(self.bins)
         
         # State-action pair tracking for packets w timestamps
         # {packet_id: (state, action, timestamp)}
         self.packet_history = {}
 
         # Register hooks for packet events
-        # simulator.register_hook('packet_hop', self.on_packet_hop)
+        simulator.register_hook('packet_hop', self.on_packet_hop)
         simulator.register_hook('packet_arrived', self.on_packet_arrived)
         simulator.register_hook('packet_dropped', self.on_packet_dropped)
+        simulator.register_hook('sim_end', self.on_sim_end)
         
     def _usage_to_bin(self, usage: float)->int:
         for i, divider in enumerate(self.bins):
@@ -176,6 +176,15 @@ class QRouter(Router):
 
             self.update_q_table(prev_state, prev_action, reward, is_terminal=True)
             del self.packet_history[packet.id]
+
+    def on_sim_end(self, metrics):
+        from pprint import pprint
+        def convert_to_dict(d):
+            if isinstance(d, defaultdict):
+                d = dict({k: convert_to_dict(v) for k, v in d.items()})
+            return d
+        print(f"Node {self.node.id} q table:")
+        pprint(convert_to_dict(self.q_table))
 
     def _calculate_hop_reward(self, packet: Packet, to_node, time_diff):
         """Calc reward for successful hop"""
@@ -275,7 +284,7 @@ def router_factory(
         return LeastCongestionFirstRouter(node)
     elif router_type == "QL":
         if simulator is None:
-            raise ValueError("wtf")
+            raise ValueError("Who forgot a simulator for the q router")
         return QRouter(node, simulator, **kwargs)
     else:
         # Default to FIFO

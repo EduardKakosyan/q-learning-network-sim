@@ -39,6 +39,9 @@ def run_simulation(router_type, duration=30.0):
 
     def create_router(node):
         return router_factory(router_type, node, simulator=simulator)
+    
+    def create_q_router(node):
+        return router_factory("QL", node, simulator)
 
     simulator.add_node(1, router_func=create_router, buffer_size=1e6)
     simulator.add_node(2, buffer_size=1e6)
@@ -46,12 +49,12 @@ def run_simulation(router_type, duration=30.0):
     simulator.add_node(4, buffer_size=1e6)
     simulator.add_node(5, buffer_size=1e6)
 
-    simulator.add_link(1, 2, 8e6, 0.01)
-    simulator.add_link(1, 3, 8e6, 0.01)
-    simulator.add_link(1, 4, 8e6, 0.01)
-    simulator.add_link(2, 5, 8e6, 0.01)
-    simulator.add_link(3, 5, 8e6, 0.01)
-    simulator.add_link(4, 5, 8e6, 0.01)
+    simulator.add_link(1, 2, 1e7, 0.01)
+    simulator.add_link(1, 3, 1e7, 0.01)
+    simulator.add_link(1, 4, 1e7, 0.01)
+    simulator.add_link(2, 5, 1e7, 0.01)
+    simulator.add_link(3, 5, 1e7, 0.01)
+    simulator.add_link(4, 5, 1e7, 0.01)
 
     simulator.compute_shortest_paths()
 
@@ -88,7 +91,7 @@ def main():
         )
 
         fairness = calculate_fairness_index(simulator)
-        print(f"  Fairness index: {fairness:.4f}")
+        print(f"Fairness index: {fairness:.4f}")
         print("Number of packets:", len(simulator.packets))
         if simulator.dropped_packets:
             counter = Counter([f"{packet.current_node}: {reason}" for packet, reason in simulator.dropped_packets])
