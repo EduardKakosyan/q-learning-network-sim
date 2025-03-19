@@ -7,11 +7,11 @@ This module defines the Node class, which represents a network node
 from collections import deque
 import time
 import simpy
-from typing import Deque, Dict, Optional, Tuple
+from typing import Callable, Deque, Dict, Tuple
 
 from network_sim.core.link import Link
 from network_sim.core.packet import Packet
-from network_sim.core.routing_algorithms import Router, DijkstraRouter
+from network_sim.core.routing_algorithms import Router
 
 
 class Node:
@@ -32,7 +32,7 @@ class Node:
         self,
         env: simpy.Environment,
         node_id: int,
-        router: Optional[Router] = None,
+        router_func: Callable[..., Router],
         buffer_size: float = float("inf"),
     ):
         """Initialize a network node.
@@ -45,7 +45,9 @@ class Node:
         """
         self.env = env
         self.id = node_id
-        self.router = router if router else DijkstraRouter()
+        self.router = router_func(self)
+        if self.router is None:
+            raise ValueError("router_func did not return a router")
         self.buffer_used = 0
         self.buffer_size = buffer_size
         self.links: Dict[int, Link] = {}
@@ -125,7 +127,7 @@ class Node:
             the scheduling delay.
         """
         start_time = time.perf_counter()
-        hop = self.router.route_packet(self, packet)
+        hop = self.router.route_packet(packet)
         end_time = time.perf_counter()
         scheduling_delay = end_time - start_time
         

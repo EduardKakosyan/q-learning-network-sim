@@ -35,7 +35,8 @@ class Packet:
     hops: List[Tuple[int, float]] = field(default_factory=list)
     arrival_time: Optional[float] = None
     dropped: bool = False
-    queuing_delays: List[float] = field(default_factory=list)
+    routing_delays: List[Tuple[int, float]] = field(default_factory=list)
+    queuing_delays: List[Tuple[int, float]] = field(default_factory=list)
     flow_id: str = field(init=False)
 
     _id_counter: int = field(default=0, init=False, repr=False)
@@ -57,13 +58,21 @@ class Packet:
         self.hops.append((node, time))
         self.current_node = node
 
-    def record_queuing_delay(self, delay: float) -> None:
+    def record_routing_delay(self, node: int, delay: float) -> None:
         """Record queuing delay at a node.
 
         Args:
             delay: Queuing delay in seconds.
         """
-        self.queuing_delays.append(delay)
+        self.routing_delays.append((node, delay))
+
+    def record_queuing_delay(self, node: int, delay: float) -> None:
+        """Record queuing delay at a node.
+
+        Args:
+            delay: Queuing delay in seconds.
+        """
+        self.queuing_delays.append((node, delay))
 
     def get_total_delay(self) -> Optional[float]:
         """Calculate total delay if packet has arrived.

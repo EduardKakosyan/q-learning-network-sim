@@ -37,24 +37,27 @@ def run_simulation(router_type, duration=30.0):
     env = simpy.Environment()
     simulator = NetworkSimulator(env, router_type)
 
-    def create_router():
-        return router_factory(router_type, simulator=simulator)
+    def create_router(node):
+        return router_factory(router_type, node, simulator=simulator)
 
-    simulator.add_node(1, router=create_router(), buffer_size=1e6)
+    simulator.add_node(1, router_func=create_router, buffer_size=1e6)
     simulator.add_node(2, buffer_size=1e6)
     simulator.add_node(3, buffer_size=1e6)
     simulator.add_node(4, buffer_size=1e6)
+    simulator.add_node(5, buffer_size=1e6)
 
     simulator.add_link(1, 2, 8e6, 0.01)
     simulator.add_link(1, 3, 8e6, 0.01)
-    simulator.add_link(2, 4, 8e6, 0.01)
-    simulator.add_link(3, 4, 8e6, 0.01)
+    simulator.add_link(1, 4, 8e6, 0.01)
+    simulator.add_link(2, 5, 8e6, 0.01)
+    simulator.add_link(3, 5, 8e6, 0.01)
+    simulator.add_link(4, 5, 8e6, 0.01)
 
     simulator.compute_shortest_paths()
 
     simulator.packet_generator(
         source=1,
-        destination=4,
+        destination=5,
         packet_size=constant_size(1000),
         interval=constant_traffic(2000),
     )

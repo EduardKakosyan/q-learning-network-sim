@@ -63,7 +63,8 @@ class NetworkSimulator:
             "average_delay": 0,
             "packet_loss_rate": 0,
             "link_utilization": defaultdict(float),
-            "queue_lengths": defaultdict(float),
+            "average_queue_delays": defaultdict(float),
+            "average_routing_delays": defaultdict(float),
         }
 
         self.hooks: Dict[str, List[Callable[..., Any]]] = {
@@ -75,7 +76,7 @@ class NetworkSimulator:
     def add_node(
         self,
         node_id: int,
-        router: Optional[Router] = None,
+        router_func: Callable[..., Router] = DijkstraRouter,
         buffer_size: float = float("inf"),
     ) -> Node:
         """Add a node to the network.
@@ -87,7 +88,7 @@ class NetworkSimulator:
         Returns:
             The created Node object.
         """
-        node = Node(self.env, node_id, router, buffer_size)
+        node = Node(self.env, node_id, router_func, buffer_size)
         self.nodes[node_id] = node
         self.graph.add_node(node_id)
         return node
@@ -224,6 +225,7 @@ class NetworkSimulator:
             with current_node.resource.request() as node_resource:
                 yield node_resource
                 queuing_delay = self.env.now - queuing_start
+                packet.record_queuing_delay(current_node.id, queuing_delay)
 
                 if packet.current_node == packet.destination:
                     self.packet_arrived(packet)
@@ -245,13 +247,12 @@ class NetworkSimulator:
                 queuing_start = self.env.now
                 with link.resource.request() as link_resource:
                     yield link_resource
-                    
-                    # Release the node_resource early once we are "sending" the packet
-                    current_node.resource.release(node_resource)
-                    
                     queuing_delay = self.env.now - queuing_start
-                    queuing_delay += routing_delay
-                    packet.record_queuing_delay(queuing_delay)
+                    routing_delay += queuing_delay
+                    packet.record_routing_delay(current_node.id, routing_delay)
+                    
+                    # Release the node_resource once we are "sending" the packet
+                    current_node.resource.release(node_resource)
 
                     transmission_delay = link.calculate_transmission_delay(packet.size)
                     yield self.env.timeout(transmission_delay)
@@ -336,25 +337,43 @@ class NetworkSimulator:
                 utilization = bits_sent / max_bits if max_bits != 0 else 0
             link_utilization[(source, destination)] = utilization
 
-        def average(inputs):
-            total = sum(inputs)
-            if total == 0:
-                return total
-            return total / len(inputs)
+        totals: Dict[int, int] = {}
+        average_queue_delays: Dict[int, float] = {}
+        def gather_packet_stats(packets: List[Packet]):
+            for packet in packets:
+                for node, delay in packet.queuing_delays:
+                    if node not in totals:
+                        totals[node] = 0
+                        average_queue_delays[node] = 0.0
+                    totals[node] += 1
+                    average_queue_delays[node] += delay
+        gather_packet_stats(self.completed_packets)
+        gather_packet_stats(map(lambda x: x[0], self.dropped_packets))
+        for node, delay in average_queue_delays.items():
+            average_queue_delays[node] = delay / totals[node]
 
-        dropped_queues = [sum(p.queuing_delays) for p, _ in self.dropped_packets]
-        completed_queues = [sum(p.queuing_delays) for p in self.completed_packets]
-        queue_lengths = {
-            'dropped': average(dropped_queues),
-            'arrived': average(completed_queues)
-        }
-
+        totals: Dict[int, int] = {}
+        average_routing_delays: Dict[int, float] = {}
+        def gather_packet_stats(packets: List[Packet]):
+            for packet in packets:
+                for node, delay in packet.routing_delays:
+                    if node not in totals:
+                        totals[node] = 0
+                        average_routing_delays[node] = 0.0
+                    totals[node] += 1
+                    average_routing_delays[node] += delay
+        gather_packet_stats(self.completed_packets)
+        gather_packet_stats(map(lambda x: x[0], self.dropped_packets))
+        for node, delay in average_routing_delays.items():
+            average_routing_delays[node] = delay / totals[node]
+        
         self.metrics["throughput"] = throughput
         self.metrics["average_delay"] = average_delay
         self.metrics["packet_loss_rate"] = packet_loss_rate
         self.metrics["link_utilization"] = link_utilization
         self.metrics["router_type"] = self.router_type
-        self.metrics["queue_lengths"] = queue_lengths
+        self.metrics["average_queue_delays"] = average_queue_delays
+        self.metrics["average_routing_delays"] = average_routing_delays
 
         return self.metrics
 
