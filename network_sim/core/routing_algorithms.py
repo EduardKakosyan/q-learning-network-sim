@@ -77,7 +77,16 @@ class LeastCongestionFirstRouter(Router):
 class QRouter(Router):
     """Q-Learning based scheduling algorithm"""
 
-    def __init__(self, node: 'Node', simulator: 'NetworkSimulator', learning_rate=0.1, discount_factor=0.9, exploration_rate=0.1, bins=4, bin_base=10):
+    def __init__(
+        self,
+        node: 'Node',
+        simulator: 'NetworkSimulator',
+        learning_rate=0.1,
+        discount_factor=0.9,
+        exploration_rate=0.1, 
+        bins=4,
+        bin_base=10
+    ):
         super().__init__(node)
         self.name = "Q-Router"
         self.learning_rate = learning_rate

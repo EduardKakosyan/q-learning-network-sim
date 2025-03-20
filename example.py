@@ -27,7 +27,14 @@ from network_sim.utils.metrics import (
 )
 
 
-def simulator_creator(num_nodes, excess_edges, num_generators, seed=42) -> Callable[[str], NetworkSimulator]:
+def simulator_creator(
+    num_nodes,
+    excess_edges,
+    num_generators,
+    router_time_scale=1.0,
+    ql_params = {},
+    seed=42
+) -> Callable[[str], NetworkSimulator]:
     random.seed(seed)
     np.random.seed(seed)
 
@@ -76,13 +83,13 @@ def simulator_creator(num_nodes, excess_edges, num_generators, seed=42) -> Calla
         simulator = NetworkSimulator(env, router_type)
 
         def create_router(node):
-            return router_factory(router_type, node, simulator=simulator)
+            return router_factory(router_type, node, simulator=simulator, **ql_params)
 
         for node in range(1, num_nodes + 1):
-            simulator.add_node(node, router_func=create_router, buffer_size=1e4)
+            simulator.add_node(node, router_func=create_router, buffer_size=1e4, time_scale=router_time_scale)
 
         for edge, delay in zip(edges, link_delays):
-            simulator.add_link(edge[0], edge[1], 1e4, delay)
+            simulator.add_link(edge[0], edge[1], 5e4, delay)
 
         simulator.compute_shortest_paths()
 
@@ -125,15 +132,30 @@ def run_simulation(
 
 def main():
     """Run simulations with different routers and compare results."""
-    os.makedirs("results", exist_ok=True)
 
+    # Topology parameters
+    num_nodes = 8
+    excess_edges = 0
+    num_generators = 5
+    
+    # Simulation parameters
     routers = ["Dijkstra", "LCF", "QL"]
+    router_time_scale = 1.0
+    duration = 10.0
+    
+    # Q Learning parameters
+    ql_params = {        
+        "learning_rate": 0.1,
+        "discount_factor": 0.9,
+        "exploration_rate": 0.1,
+        "bins": 4,
+        "bin_base": 10,
+    }
+
+    simulator_func = simulator_creator(num_nodes, excess_edges, num_generators, router_time_scale, ql_params)
+
     simulators = []
     metrics_list = []
-
-    simulator_func = simulator_creator(num_nodes=8, excess_edges=10, num_generators=5)
-    duration = 10.0
-
     for router in routers:
         print(f"Running simulation with {router} router...")
         simulator = run_simulation(simulator_func, router, duration)

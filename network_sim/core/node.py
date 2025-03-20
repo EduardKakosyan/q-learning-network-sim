@@ -34,6 +34,7 @@ class Node:
         node_id: int,
         router_func: Callable[[], Router],
         buffer_size: float = float("inf"),
+        time_scale: float = 1.0,
     ):
         """Initialize a network node.
 
@@ -45,11 +46,12 @@ class Node:
         """
         self.env = env
         self.id = node_id
-        self.router = router_func(self)
+        self.router: Router = router_func(self)
         if self.router is None:
             raise ValueError("router_func did not return a router")
         self.buffer_used = 0
         self.buffer_size = buffer_size
+        self.time_scale = time_scale
         self.links: Dict[int, Link] = {}
         self.routing_table: Dict[int, int] = {}
         self.packets_arrived = 0
@@ -129,7 +131,7 @@ class Node:
         start_time = time.perf_counter()
         hop = self.router.route_packet(packet)
         end_time = time.perf_counter()
-        scheduling_delay = end_time - start_time
+        scheduling_delay = (end_time - start_time) * self.time_scale
 
         self.queue.remove(packet)
         self.buffer_used -= packet.size

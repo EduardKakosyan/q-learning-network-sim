@@ -81,6 +81,7 @@ class NetworkSimulator:
         node_id: int,
         router_func: Callable[[], Router] = DijkstraRouter,
         buffer_size: float = float("inf"),
+        time_scale = 1.0,
     ) -> Node:
         """Add a node to the network.
 
@@ -91,7 +92,7 @@ class NetworkSimulator:
         Returns:
             The created Node object.
         """
-        node = Node(self.env, node_id, router_func, buffer_size)
+        node = Node(self.env, node_id, router_func, buffer_size, time_scale)
         self.nodes[node_id] = node
         self.graph.add_node(node_id)
         return node
