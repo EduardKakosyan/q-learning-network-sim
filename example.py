@@ -33,7 +33,8 @@ def simulator_creator(
     num_generators,
     router_time_scale=1.0,
     ql_params = {},
-    seed=42
+    seed=42,
+    log=False,
 ) -> Callable[[str], NetworkSimulator]:
     random.seed(seed)
     np.random.seed(seed)
@@ -64,7 +65,7 @@ def simulator_creator(
         for j in range(1, num_nodes + 1):
             if i != j and (i, j) not in edges and (j, i) not in edges:
                 possible_node_pairs.append((i, j))
-    
+
     node_pairs: List[Tuple[int, int]] = []
     while len(possible_node_pairs) > 0:
         source, destination = random.sample(possible_node_pairs, 1)[0]
@@ -74,9 +75,10 @@ def simulator_creator(
         possible_node_pairs = [pair for pair in possible_node_pairs if pair[0] != source]
     else:
         raise ValueError(f"Cannot generate {num_generators} node pairs. Max is {len(node_pairs)}")
-    
-    print("Generators:")
-    print(node_pairs)
+
+    if log:
+        print("Generators:")
+        print(node_pairs)
 
     def instantiate_simulator(router_type: str) -> NetworkSimulator:
         env = simpy.Environment()
@@ -135,24 +137,32 @@ def main():
 
     # Topology parameters
     num_nodes = 8
-    excess_edges = 0
+    excess_edges = 10
     num_generators = 5
-    
+
     # Simulation parameters
     routers = ["Dijkstra", "LCF", "QL"]
-    router_time_scale = 1.0
+    router_time_scale = 0.0
     duration = 10.0
-    
-    # Q Learning parameters
-    ql_params = {        
-        "learning_rate": 0.1,
-        "discount_factor": 0.9,
-        "exploration_rate": 0.1,
-        "bins": 4,
-        "bin_base": 10,
-    }
 
-    simulator_func = simulator_creator(num_nodes, excess_edges, num_generators, router_time_scale, ql_params)
+    # The best Q Learning parameters:
+    ql_params = {
+        "learning_rate": 0.1,
+        "discount_factor": 0.99,
+        "exploration_rate": 0.2,
+        "bins": 4,
+        "bin_base": 20,
+    }
+    # These are also pretty good:
+    # ql_params = {
+    #     "learning_rate": 0.2,
+    #     "discount_factor": 0.9,
+    #     "exploration_rate": 0.2,
+    #     "bins": 4,
+    #     "bin_base": 20,
+    # }
+
+    simulator_func = simulator_creator(num_nodes, excess_edges, num_generators, router_time_scale, ql_params, log=True)
 
     simulators = []
     metrics_list = []
@@ -167,6 +177,9 @@ def main():
             simulator, f"results/{router.lower()}_link_utilization.png"
         )
 
+        delay = simulator.metrics["average_delay"]
+        packet_loss = simulator.metrics["packet_loss_rate"]
+        throughput = simulator.metrics["throughput"]
         fairness = calculate_fairness_index(simulator)
         print(f"Fairness index: {fairness:.4f}")
         if simulator.dropped_packets:

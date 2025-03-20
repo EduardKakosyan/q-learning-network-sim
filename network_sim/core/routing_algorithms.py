@@ -83,7 +83,7 @@ class QRouter(Router):
         simulator: 'NetworkSimulator',
         learning_rate=0.1,
         discount_factor=0.9,
-        exploration_rate=0.1, 
+        exploration_rate=0.1,
         bins=4,
         bin_base=10
     ):

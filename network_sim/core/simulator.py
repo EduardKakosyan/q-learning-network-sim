@@ -448,7 +448,7 @@ class NetworkSimulator:
                     progress = counter / count * 100
                     print(f"Progress: {progress:.2f}%", end="\r")
             self.env.process(update())
-        
+
         self.env.run(until=duration)
 
         if drop_actives:
