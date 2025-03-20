@@ -79,7 +79,7 @@ class NetworkSimulator:
     def add_node(
         self,
         node_id: int,
-        router_func: Callable[..., Router] = DijkstraRouter,
+        router_func: Callable[[], Router] = DijkstraRouter,
         buffer_size: float = float("inf"),
     ) -> Node:
         """Add a node to the network.
@@ -180,7 +180,7 @@ class NetworkSimulator:
             destination: Destination node ID.
             packet_size: Size of packets in bytes.
             interval: Time between packets/bursts in seconds.
-            jitter: Random variation in interval (fraction of interval).            
+            jitter: Random variation in interval (fraction of interval).
 
         Returns:
             SimPy process for the packet generator.
@@ -211,10 +211,10 @@ class NetworkSimulator:
         Returns:
             SimPy process for the packet journey.
         """
-        
+
         def packet_journey(packet: Packet):
             current_node = self.nodes[packet.current_node]
-            
+
             if not current_node.can_queue_packet(packet):
                 self.packet_dropped(packet, "Buffer overflow")
                 yield self.env.timeout(0)
@@ -236,14 +236,14 @@ class NetworkSimulator:
                 if next_hop is None:
                     self.packet_dropped(packet, "No route to destination")
                     return
-                
+
                 link = current_node.links.get(next_hop)
                 if link is None:
                     raise ValueError("Who routed a packet to a node that isn't connected?")
-                
+
                 packet.record_routing_delay(current_node.id, routing_delay)
                 yield self.env.timeout(routing_delay)
-                
+
                 routing_delay += queuing_delay
 
                 queuing_start = self.env.now
@@ -251,20 +251,20 @@ class NetworkSimulator:
                     yield link_resource
                     link_delay = self.env.now - queuing_start
                     packet.record_link_delay(current_node.id, next_hop, link_delay)
-                    
+
                     # Release the node_resource once we are "sending" the packet
                     current_node.resource.release(node_resource)
 
                     transmission_delay = link.calculate_transmission_delay(packet.size)
                     yield self.env.timeout(transmission_delay)
-        
+
             yield self.env.timeout(link.propagation_delay)
             link.bytes_sent += packet.size
 
             packet.record_hop(next_hop, self.env.now)
             self.call_hooks('packet_hop', packet, packet.current_node, next_hop, self.env.now)
             self.env.process(self.process_packet(packet))
-        
+
         return packet_journey(packet)
 
     def packet_arrived(self, packet: Packet) -> None:
@@ -369,7 +369,7 @@ class NetworkSimulator:
         for node, delay in average_routing_delays.items():
             average_routing_delays[node] = delay / totals[node]
         average_routing_delays = {k: v for k, v in sorted(average_routing_delays.items(), key=lambda x: x[0])}
-        
+
         totals: Dict[int, int] = {}
         average_link_delays: Dict[Tuple[int, int], float] = {}
         def gather_packet_stats(packets: List[Packet]):
@@ -385,14 +385,14 @@ class NetworkSimulator:
         for link_pair, delay in average_link_delays.items():
             average_link_delays[link_pair] = delay / totals[link_pair]
         average_link_delays = {f"{c}->{n}": v for (c, n), v in sorted(average_link_delays.items(), key=lambda x: x[0])}
-        
+
         packet_drops: Dict[int, int] = {}
         for packet, _ in self.dropped_packets:
             id = packet.current_node
             if id not in packet_drops:
                 packet_drops[id] = 0
             packet_drops[id] += 1
-        
+
         self.metrics["throughput"] = throughput
         self.metrics["average_delay"] = average_delay
         self.metrics["packet_loss_rate"] = packet_loss_rate
@@ -407,7 +407,7 @@ class NetworkSimulator:
 
     def register_hook(self, event_type: str, callback: Callable[..., Any]) -> None:
         """Register a callback function for a specific event type.
-        
+
         Args:
             event_type: The type of event to register for.
             callback: The function to call when the event occurs.
@@ -418,7 +418,7 @@ class NetworkSimulator:
 
     def call_hooks(self, event_type: str, *args: Any, **kwargs: Any) -> None:
         """Call all registered callbacks for the given event type.
-        
+
         Args:
             event_type: The type of event that occurred.
             *args, **kwargs: Arguments to pass to the callback functions.
@@ -427,7 +427,7 @@ class NetworkSimulator:
             for callback in self.hooks[event_type]:
                 callback(*args, **kwargs)
 
-    def run(self, duration: float, drop_actives=False) -> Dict[str, Any]:
+    def run(self, duration: float, updates=False, drop_actives=False) -> Dict[str, Any]:
         """Run the simulation for a specified duration.
 
         Args:
@@ -436,8 +436,20 @@ class NetworkSimulator:
         Returns:
             Dictionary of calculated metrics.
         """
-        self.env.run(until=duration)
+        if updates:
+            count = 10
+            interval = duration / count
+            def update():
+                counter = 0
+                while True:
+                    yield self.env.timeout(interval)
+                    counter += 1
+                    progress = counter / count * 100
+                    print(f"Progress: {progress:.2f}%", end="\r")
+            self.env.process(update())
         
+        self.env.run(until=duration)
+
         if drop_actives:
             for packet_id in list(self.active_packet_ids):
                 packets = [p for p in self.packets if p.id == packet_id]
@@ -447,7 +459,7 @@ class NetworkSimulator:
                 self.packet_dropped(packet, "Simulation ended")
 
         self.calculate_metrics()
-        
+
         self.call_hooks('sim_end', self.metrics)
 
         return self.metrics

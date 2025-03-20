@@ -64,13 +64,13 @@ class LeastCongestionFirstRouter(Router):
         smallest_buffer_usage = min(
             [neighbour.buffer_usage() for _, neighbour in self.node.neighbours.items()]
         )
-        
-        min_ids = [id for id, neighbour in self.node.neighbours.items() if smallest_buffer_usage == neighbour.buffer_usage()]    
+
+        min_ids = [id for id, neighbour in self.node.neighbours.items() if smallest_buffer_usage == neighbour.buffer_usage()]
         if not min_ids:
             raise ValueError("Who turned off the wifi?")
-        
+
         action = random.choice(min_ids)
-        
+
         return action
 
 
@@ -85,17 +85,17 @@ class QRouter(Router):
         self.exploration_rate = exploration_rate
         self.bins = [(float(x) - 1) / (bin_base - 1) for x in np.logspace(0, 1, bins + 1, base=bin_base)][1:]
         self.q_table = defaultdict(lambda: defaultdict(float))
-        
+
         # State-action pair tracking for packets w timestamps
         # {packet_id: (state, action, timestamp)}
         self.packet_history = {}
 
         # Register hooks for packet events
-        simulator.register_hook('packet_hop', self.on_packet_hop)
+        # simulator.register_hook('packet_hop', self.on_packet_hop)
         simulator.register_hook('packet_arrived', self.on_packet_arrived)
         simulator.register_hook('packet_dropped', self.on_packet_dropped)
-        simulator.register_hook('sim_end', self.on_sim_end)
-        
+        # simulator.register_hook('sim_end', self.on_sim_end)
+
     def _usage_to_bin(self, usage: float)->int:
         for i, divider in enumerate(self.bins):
             if usage <= divider:
@@ -104,11 +104,11 @@ class QRouter(Router):
 
     def _get_state(self, packet: Packet) -> Tuple[int, int, Tuple[int, ...]]:
         """Get the current state representation"""
-        
+
         buffer_usages = [
             neighbour.buffer_usage() for _, neighbour in self.node.neighbours.items()
         ]
-        
+
         bins = tuple(self._usage_to_bin(usage) for usage in buffer_usages)
 
         state = (packet.source, packet.destination, bins)
@@ -146,7 +146,7 @@ class QRouter(Router):
         self.packet_history[packet.id] = (state, action, current_time)
 
         return action
-    
+
     def on_packet_hop(self, packet: Packet, from_node, to_node, time):
         """Callback for packet_hop"""
         if packet.id in self.packet_history:
@@ -200,31 +200,31 @@ class QRouter(Router):
 
         # could add more complex rewards [congestion?]
         return reward
-    
+
     def _calculate_success_reward(self, packet: Packet):
         """Calculate reward for successful packet delivery"""
         # big pos reward for arrival
         reward = 20.0
-        
+
         # bonus for less hops
         hop_count = len(packet.hops)
         if hop_count > 0:
             efficiency_bonus = 10.0 / hop_count  # bigger bonus for less hops
             reward += efficiency_bonus
-        
+
         # bonus for less delay
         total_delay = packet.get_total_delay()
         if total_delay:
             delay_bonus = 10.0 / (1.0 + total_delay)  # bigger bonus for less delay
             reward += delay_bonus
-        
+
         return reward
 
     def _calculate_drop_reward(self, reason: str):
         """Calculate penalty for dropping a packet"""
         # big neg for dropping
         reward = -20.0
-        
+
         # more penalty based on specific reasons
         if reason == "Buffer overflow":
             # neg for overwhelmed routes
@@ -232,12 +232,12 @@ class QRouter(Router):
         elif reason == "No route to destination":
             # big neg for sending to dead end
             reward -= 10.0
-        
+
         return reward
 
     def update_q_table(self, state, action: int, reward: float, next_state=None, is_terminal=False):
         """Update Q-table using the Q-learning update rule
-        
+
         Args:
             state: Current state
             action: Action taken
@@ -247,7 +247,7 @@ class QRouter(Router):
         """
         if state is None or action is None:
             return
-            
+
         if is_terminal or next_state is None:
             # for terminal states or unknown next states, use immediate reward
             max_next_q = 0

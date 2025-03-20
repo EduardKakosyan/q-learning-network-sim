@@ -91,12 +91,12 @@ def bursty_traffic(size: int, rate: Union[float, Callable[[], float]]) -> Callab
             in_burst = True
             packets = 1
             return 0
-        
+
         if packets < size:
             # within burst
             packets+=1
             return current_rate
-        else: 
+        else:
             # next call will start new burst
             in_burst = False
             packets = 0

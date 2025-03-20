@@ -32,7 +32,7 @@ class Node:
         self,
         env: simpy.Environment,
         node_id: int,
-        router_func: Callable[..., Router],
+        router_func: Callable[[], Router],
         buffer_size: float = float("inf"),
     ):
         """Initialize a network node.
@@ -76,7 +76,7 @@ class Node:
             routing_table: Dictionary mapping destinations to next hops.
         """
         self.routing_table = routing_table
-    
+
     def can_queue_packet(self, packet: Packet) -> bool:
         """Check if there's enough buffer space for the packet.
 
@@ -107,15 +107,15 @@ class Node:
         if self.buffer_size == float("inf"):
             return self.buffer_used
         return self.buffer_used / self.buffer_size
-    
+
     def packet_arrived(self, packet: Packet):
         self.packets_arrived += 1
         self.buffer_used -= packet.size
-    
+
     def packet_dropped(self, packet: Packet):
         self.packets_dropped += 1
         self.buffer_used -= packet.size
-    
+
     def route_packet(self, packet: Packet) -> Tuple[int, float]:
         """Get the next packet to transmit based on router type.
 
@@ -130,10 +130,10 @@ class Node:
         hop = self.router.route_packet(packet)
         end_time = time.perf_counter()
         scheduling_delay = end_time - start_time
-        
+
         self.queue.remove(packet)
         self.buffer_used -= packet.size
-        
+
         return hop, scheduling_delay
 
     def __repr__(self) -> str:
