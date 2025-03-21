@@ -85,10 +85,11 @@ def bursty_traffic(
         packet_interval if callable(packet_interval) else lambda: packet_interval
     )
 
-    packets_remaining = 0
+    in_burst = False
+    packets = 0
 
     def next_packet_delay() -> float:
-        nonlocal packets_remaining
+        nonlocal in_burst, packets
         interval = get_interval()
 
         if not in_burst:
@@ -97,15 +98,15 @@ def bursty_traffic(
             packets = 1
             return 0
 
-        if packets < size:
-            # within burst
-            packets+=1
-            return current_rate
+        if packets < burst_size:
+            # continue burst
+            packets += 1
+            return interval
         else:
-            # next call will start new burst
+            # end burst
             in_burst = False
             packets = 0
-            return current_rate * size
+            return interval * burst_size
 
     return next_packet_delay
 

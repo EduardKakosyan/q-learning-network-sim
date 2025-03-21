@@ -14,7 +14,7 @@ from typing import Dict, List, Set, Tuple, Callable, Optional, Any
 from network_sim.core.packet import Packet
 from network_sim.core.link import Link
 from network_sim.core.node import Node
-from network_sim.core.routing_algorithms import Router
+from network_sim.core.routing_algorithms import Router, DijkstraRouter
 
 
 class NetworkSimulator:
@@ -70,10 +70,10 @@ class NetworkSimulator:
         }
 
         self.hooks: Dict[str, List[Callable[..., Any]]] = {
-            'packet_hop': [],       # packet moves between nodes
-            'packet_arrived': [],   # packet reaches destination
-            'packet_dropped': [],   # packet dropped
-            'sim_end': [],          # the simulation ends
+            "packet_hop": [],  # packet moves between nodes
+            "packet_arrived": [],  # packet reaches destination
+            "packet_dropped": [],  # packet dropped
+            "sim_end": [],  # the simulation ends
         }
 
     def add_node(
@@ -81,7 +81,7 @@ class NetworkSimulator:
         node_id: int,
         router_func: Callable[[], Router] = DijkstraRouter,
         buffer_size: float = float("inf"),
-        time_scale = 1.0,
+        time_scale=1.0,
     ) -> Node:
         """Add a node to the network.
 
@@ -98,12 +98,8 @@ class NetworkSimulator:
         return node
 
     def add_link(
-        self,
-        source: int,
-        destination: int,
-        capacity: float,
-        propagation_delay: float
-    ) -> Tuple[Link,Link]:
+        self, source: int, destination: int, capacity: float, propagation_delay: float
+    ) -> Tuple[Link, Link]:
         """Add a BIDIRECTIONAL link between nodes.
 
         Args:
@@ -137,7 +133,7 @@ class NetworkSimulator:
             capacity=capacity,
             delay=propagation_delay,
         )
-        return Tuple[Link,Link]
+        return Tuple[Link, Link]
 
     def compute_shortest_paths(self) -> None:
         """Compute shortest paths and set routing tables for all nodes."""
@@ -240,7 +236,9 @@ class NetworkSimulator:
 
                 link = current_node.links.get(next_hop)
                 if link is None:
-                    raise ValueError("Who routed a packet to a node that isn't connected?")
+                    raise ValueError(
+                        "Who routed a packet to a node that isn't connected?"
+                    )
 
                 packet.record_routing_delay(current_node.id, routing_delay)
                 yield self.env.timeout(routing_delay)
@@ -263,7 +261,9 @@ class NetworkSimulator:
             link.bytes_sent += packet.size
 
             packet.record_hop(next_hop, self.env.now)
-            self.call_hooks('packet_hop', packet, packet.current_node, next_hop, self.env.now)
+            self.call_hooks(
+                "packet_hop", packet, packet.current_node, next_hop, self.env.now
+            )
             self.env.process(self.process_packet(packet))
 
         return packet_journey(packet)
@@ -278,7 +278,9 @@ class NetworkSimulator:
         self.active_packet_ids.remove(packet.id)
         self.completed_packets.append(packet)
         self.nodes[packet.destination].packet_arrived(packet)
-        self.call_hooks('packet_arrived', packet, self.nodes[packet.destination], self.env.now)
+        self.call_hooks(
+            "packet_arrived", packet, self.nodes[packet.destination], self.env.now
+        )
 
     def packet_dropped(self, packet: Packet, reason: str) -> None:
         """Handle packet drop.
@@ -292,7 +294,13 @@ class NetworkSimulator:
             self.active_packet_ids.remove(packet.id)
         self.dropped_packets.append((packet, reason))
         self.nodes[packet.current_node].packet_dropped(packet)
-        self.call_hooks('packet_dropped', packet, self.nodes[packet.current_node], reason, self.env.now)
+        self.call_hooks(
+            "packet_dropped",
+            packet,
+            self.nodes[packet.current_node],
+            reason,
+            self.env.now,
+        )
 
     def calculate_metrics(
         self, start_time: float = 0, end_time: Optional[float] = None
@@ -341,6 +349,7 @@ class NetworkSimulator:
 
         totals: Dict[int, int] = {}
         average_queue_delays: Dict[int, float] = {}
+
         def gather_packet_stats(packets: List[Packet]):
             for packet in packets:
                 for node, delay in packet.queuing_delays:
@@ -349,14 +358,18 @@ class NetworkSimulator:
                         average_queue_delays[node] = 0.0
                     totals[node] += 1
                     average_queue_delays[node] += delay
+
         gather_packet_stats(self.completed_packets)
         gather_packet_stats(map(lambda x: x[0], self.dropped_packets))
         for node, delay in average_queue_delays.items():
             average_queue_delays[node] = delay / totals[node]
-        average_queue_delays = {k: v for k, v in sorted(average_queue_delays.items(), key=lambda x: x[0])}
+        average_queue_delays = {
+            k: v for k, v in sorted(average_queue_delays.items(), key=lambda x: x[0])
+        }
 
         totals: Dict[int, int] = {}
         average_routing_delays: Dict[int, float] = {}
+
         def gather_packet_stats(packets: List[Packet]):
             for packet in packets:
                 for node, delay in packet.routing_delays:
@@ -365,14 +378,18 @@ class NetworkSimulator:
                         average_routing_delays[node] = 0.0
                     totals[node] += 1
                     average_routing_delays[node] += delay
+
         gather_packet_stats(self.completed_packets)
         gather_packet_stats(map(lambda x: x[0], self.dropped_packets))
         for node, delay in average_routing_delays.items():
             average_routing_delays[node] = delay / totals[node]
-        average_routing_delays = {k: v for k, v in sorted(average_routing_delays.items(), key=lambda x: x[0])}
+        average_routing_delays = {
+            k: v for k, v in sorted(average_routing_delays.items(), key=lambda x: x[0])
+        }
 
         totals: Dict[int, int] = {}
         average_link_delays: Dict[Tuple[int, int], float] = {}
+
         def gather_packet_stats(packets: List[Packet]):
             for packet in packets:
                 for link_pair, delay in packet.link_delays:
@@ -381,11 +398,15 @@ class NetworkSimulator:
                         average_link_delays[link_pair] = 0.0
                     totals[link_pair] += 1
                     average_link_delays[link_pair] += delay
+
         gather_packet_stats(self.completed_packets)
         gather_packet_stats(map(lambda x: x[0], self.dropped_packets))
         for link_pair, delay in average_link_delays.items():
             average_link_delays[link_pair] = delay / totals[link_pair]
-        average_link_delays = {f"{c}->{n}": v for (c, n), v in sorted(average_link_delays.items(), key=lambda x: x[0])}
+        average_link_delays = {
+            f"{c}->{n}": v
+            for (c, n), v in sorted(average_link_delays.items(), key=lambda x: x[0])
+        }
 
         packet_drops: Dict[int, int] = {}
         for packet, _ in self.dropped_packets:
@@ -440,6 +461,7 @@ class NetworkSimulator:
         if updates:
             count = 10
             interval = duration / count
+
             def update():
                 counter = 0
                 while True:
@@ -447,6 +469,7 @@ class NetworkSimulator:
                     counter += 1
                     progress = counter / count * 100
                     print(f"Progress: {progress:.2f}%", end="\r")
+
             self.env.process(update())
 
         self.env.run(until=duration)
@@ -461,6 +484,6 @@ class NetworkSimulator:
 
         self.calculate_metrics()
 
-        self.call_hooks('sim_end', self.metrics)
+        self.call_hooks("sim_end", self.metrics)
 
         return self.metrics
