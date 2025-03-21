@@ -7,11 +7,11 @@ This module defines the Node class, which represents a network node
 from collections import deque
 import time
 import simpy
-from typing import Deque, Dict, Optional, Tuple
+from typing import Callable, Deque, Dict, Tuple
 
 from network_sim.core.link import Link
 from network_sim.core.packet import Packet
-from network_sim.core.routing_algorithms import Router, DijkstraRouter
+from network_sim.core.routing_algorithms import Router
 
 
 class Node:
@@ -32,8 +32,9 @@ class Node:
         self,
         env: simpy.Environment,
         node_id: int,
-        router: Optional[Router] = None,
+        router_func: Callable[[], Router],
         buffer_size: float = float("inf"),
+        time_scale: float = 1.0,
     ):
         """Initialize a network node.
 
@@ -45,9 +46,12 @@ class Node:
         """
         self.env = env
         self.id = node_id
-        self.router = router if router else DijkstraRouter()
+        self.router: Router = router_func(self)
+        if self.router is None:
+            raise ValueError("router_func did not return a router")
         self.buffer_used = 0
         self.buffer_size = buffer_size
+        self.time_scale = time_scale
         self.links: Dict[int, Link] = {}
         self.routing_table: Dict[int, int] = {}
         self.packets_arrived = 0
@@ -63,7 +67,7 @@ class Node:
             link: The link to add.
         """
         if link.source != self.id or link.destination == self.id:
-            raise ValueError("wtf")
+            raise ValueError("Who assigns a link to a node that isn't connected to the node?")
         self.links[link.destination] = link
         self.neighbours[link.destination] = node
 
@@ -74,7 +78,7 @@ class Node:
             routing_table: Dictionary mapping destinations to next hops.
         """
         self.routing_table = routing_table
-    
+
     def can_queue_packet(self, packet: Packet) -> bool:
         """Check if there's enough buffer space for the packet.
 
@@ -105,15 +109,15 @@ class Node:
         if self.buffer_size == float("inf"):
             return self.buffer_used
         return self.buffer_used / self.buffer_size
-    
+
     def packet_arrived(self, packet: Packet):
         self.packets_arrived += 1
         self.buffer_used -= packet.size
-    
+
     def packet_dropped(self, packet: Packet):
         self.packets_dropped += 1
         self.buffer_used -= packet.size
-    
+
     def route_packet(self, packet: Packet) -> Tuple[int, float]:
         """Get the next packet to transmit based on router type.
 
@@ -125,13 +129,13 @@ class Node:
             the scheduling delay.
         """
         start_time = time.perf_counter()
-        hop = self.router.route_packet(self, packet)
+        hop = self.router.route_packet(packet)
         end_time = time.perf_counter()
-        scheduling_delay = end_time - start_time
-        
+        scheduling_delay = (end_time - start_time) * self.time_scale
+
         self.queue.remove(packet)
         self.buffer_used -= packet.size
-        
+
         return hop, scheduling_delay
 
     def __repr__(self) -> str:

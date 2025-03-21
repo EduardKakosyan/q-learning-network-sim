@@ -1,5 +1,6 @@
 matplotlib
-numpy
-simpy
 networkx
+numpy
+optuna
 pydot
+simpy

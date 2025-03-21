@@ -91,19 +91,21 @@ def bursty_traffic(
         nonlocal packets_remaining
         interval = get_interval()
 
-        # Start of new burst
-        if packets_remaining == 0:
-            packets_remaining = burst_size - 1  # -1 since we're sending first packet
-            return 0.0
+        if not in_burst:
+            # start new burst
+            in_burst = True
+            packets = 1
+            return 0
 
-        # Middle of burst
-        if packets_remaining > 0:
-            packets_remaining -= 1
-            return interval
-
-        # End of burst - add delay before next burst
-        packets_remaining = 0
-        return interval * burst_size
+        if packets < size:
+            # within burst
+            packets+=1
+            return current_rate
+        else:
+            # next call will start new burst
+            in_burst = False
+            packets = 0
+            return current_rate * size
 
     return next_packet_delay
 

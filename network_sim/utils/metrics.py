@@ -95,11 +95,6 @@ def compare_routers(
         metrics_list, router_types, f"{output_dir}/metrics_comparison.csv"
     )
 
-    for i, sim in enumerate(simulators):
-        save_metrics_to_json(
-            sim.metrics, f"{output_dir}/{sim.router_type.lower()}_metrics.json"
-        )
-
     # Create comparison dictionary
     comparison = {
         "router_types": router_types,
