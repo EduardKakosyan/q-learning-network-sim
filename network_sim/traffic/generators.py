@@ -6,7 +6,7 @@ including constant, variable, Poisson, and Pareto traffic patterns.
 
 import random
 import numpy as np
-from typing import Callable
+from typing import Callable, Union
 
 
 def constant_traffic(rate: float) -> Callable[[], float]:
@@ -58,6 +58,57 @@ def pareto_traffic(rate: float, alpha: float = 1.5) -> Callable[[], float]:
     """
     scale = (alpha - 1) / (alpha * rate)
     return lambda: np.random.pareto(alpha) * scale
+
+
+def bursty_traffic(
+    burst_size: int, packet_interval: Union[float, Callable[[], float]]
+) -> Callable[[], float]:
+    """Generate bursty network traffic pattern.
+
+    Creates traffic that comes in bursts of packets followed by quiet periods.
+    Each burst contains a fixed number of packets sent at regular intervals,
+    followed by a longer gap before the next burst starts.
+
+    Args:
+        burst_size: Number of packets to send in each burst
+        packet_interval: Time between packets within a burst, either as:
+            - Fixed float value in seconds
+            - Callable that returns variable intervals
+
+    Returns:
+        Function that returns the time interval until the next packet should be sent:
+        - Returns 0 for first packet in burst (send immediately)
+        - Returns packet_interval for subsequent packets in burst
+        - Returns packet_interval * burst_size for gap between bursts
+    """
+    get_interval = (
+        packet_interval if callable(packet_interval) else lambda: packet_interval
+    )
+
+    in_burst = False
+    packets = 0
+
+    def next_packet_delay() -> float:
+        nonlocal in_burst, packets
+        interval = get_interval()
+
+        if not in_burst:
+            # start new burst
+            in_burst = True
+            packets = 1
+            return 0
+
+        if packets < burst_size:
+            # continue burst
+            packets += 1
+            return interval
+        else:
+            # end burst
+            in_burst = False
+            packets = 0
+            return interval * burst_size
+
+    return next_packet_delay
 
 
 def constant_size(size: int) -> Callable[[], int]:

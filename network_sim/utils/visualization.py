@@ -4,10 +4,12 @@ This module provides functions for visualizing network simulation results,
 including network topology, traffic patterns, and performance metrics.
 """
 
-import os
-import matplotlib.pyplot as plt
-import numpy as np
 from typing import Dict, Any, List, Tuple, Optional
+import matplotlib.pyplot as plt
+import networkx as nx
+import numpy as np
+import os
+import pydot # This import is just to show that it is being used by the project.
 
 from network_sim.core.simulator import NetworkSimulator
 
@@ -22,23 +24,51 @@ def save_network_visualization(
         filename: Output filename.
         figsize: Figure size as (width, height) in inches.
     """
-    plt_figure = simulator.visualize_network(figsize)
+    fig = plt.figure(figsize=figsize)
+
+    graph = simulator.graph
+    pos = nx.nx_pydot.graphviz_layout(graph)
+
+    nx.draw_networkx_nodes(graph, pos, node_size=500, node_color="lightblue")
+
+    nx.draw_networkx_edges(
+        graph,
+        pos,
+        alpha=0.7,
+        edge_color="gray",
+        arrows=True,
+        arrowsize=15,
+    )
+
+    nx.draw_networkx_labels(graph, pos, font_size=12)
+
+    edge_labels = {
+        (u, v): f"{graph[u][v]['capacity']/1000000:.1f}Mbps\n{graph[u][v]['delay']*1000:.1f}ms"
+        for u, v in graph.edges()
+    }
+    nx.draw_networkx_edge_labels(
+        graph, pos, edge_labels=edge_labels, font_size=8
+    )
+
+    plt.title(f"Network Topology (Router: {simulator.router_type})")
+    plt.axis("off")
+    plt.tight_layout()
 
     os.makedirs(os.path.dirname(filename), exist_ok=True)
-    plt_figure.savefig(filename)
-    plt.close(plt_figure)
+    fig.savefig(filename)
+    plt.close(fig)
 
 
 def plot_metrics(
     metrics_list: List[Dict[str, Any]],
-    scheduler_types: List[str],
+    router_types: List[str],
     output_dir: str = "results",
 ) -> None:
-    """Plot and save performance metrics for different schedulers.
+    """Plot and save performance metrics for different routers.
 
     Args:
         metrics_list: List of metrics dictionaries from different simulations.
-        scheduler_types: List of scheduler types corresponding to metrics_list.
+        router_types: List of router types corresponding to metrics_list.
         output_dir: Directory to save output plots.
     """
     os.makedirs(output_dir, exist_ok=True)
@@ -46,30 +76,30 @@ def plot_metrics(
     # Throughput comparison
     plt.figure(figsize=(10, 6))
     throughputs = [m["throughput"] for m in metrics_list]
-    plt.bar(scheduler_types, throughputs)
+    plt.bar(router_types, throughputs)
     plt.title("Throughput Comparison")
     plt.ylabel("Throughput (bytes/second)")
-    plt.xlabel("Scheduler Type")
+    plt.xlabel("Router Type")
     plt.savefig(f"{output_dir}/throughput_comparison.png")
     plt.close()
 
     # Delay comparison
     plt.figure(figsize=(10, 6))
     delays = [m["average_delay"] for m in metrics_list]
-    plt.bar(scheduler_types, delays)
+    plt.bar(router_types, delays)
     plt.title("Average Delay Comparison")
     plt.ylabel("Average Delay (seconds)")
-    plt.xlabel("Scheduler Type")
+    plt.xlabel("Router Type")
     plt.savefig(f"{output_dir}/delay_comparison.png")
     plt.close()
 
     # Packet loss rate comparison
     plt.figure(figsize=(10, 6))
     loss_rates = [m["packet_loss_rate"] for m in metrics_list]
-    plt.bar(scheduler_types, loss_rates)
+    plt.bar(router_types, loss_rates)
     plt.title("Packet Loss Rate Comparison")
     plt.ylabel("Packet Loss Rate")
-    plt.xlabel("Scheduler Type")
+    plt.xlabel("Router Type")
     plt.savefig(f"{output_dir}/loss_rate_comparison.png")
     plt.close()
 
@@ -92,7 +122,7 @@ def plot_link_utilization(
 
     plt.figure(figsize=(12, 6))
     plt.bar(links, utilizations)
-    plt.title(f"Link Utilization (Scheduler: {simulator.scheduler_type})")
+    plt.title(f"Link Utilization (Router: {simulator.router_type})")
     plt.ylabel("Utilization")
     plt.xlabel("Link")
     plt.xticks(rotation=45)

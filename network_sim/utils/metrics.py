@@ -43,14 +43,14 @@ def save_metrics_to_json(
 
 def save_metrics_to_csv(
     metrics_list: List[Dict[str, Any]],
-    scheduler_types: List[str],
+    router_types: List[str],
     filename: str = "results/metrics_comparison.csv",
 ) -> None:
-    """Save comparison of metrics from different schedulers to a CSV file.
+    """Save comparison of metrics from different routers to a CSV file.
 
     Args:
         metrics_list: List of metrics dictionaries from different simulations.
-        scheduler_types: List of scheduler types corresponding to metrics_list.
+        router_types: List of router types corresponding to metrics_list.
         filename: Output filename.
     """
     os.makedirs(os.path.dirname(filename), exist_ok=True)
@@ -60,14 +60,14 @@ def save_metrics_to_csv(
 
         # Write header
         writer.writerow(
-            ["Scheduler", "Throughput", "Average Delay", "Packet Loss Rate"]
+            ["Router", "Throughput", "Average Delay", "Packet Loss Rate"]
         )
 
         # Write data
         for i, metrics in enumerate(metrics_list):
             writer.writerow(
                 [
-                    scheduler_types[i],
+                    router_types[i],
                     metrics["throughput"],
                     metrics["average_delay"],
                     metrics["packet_loss_rate"],
@@ -75,34 +75,29 @@ def save_metrics_to_csv(
             )
 
 
-def compare_schedulers(
+def compare_routers(
     simulators: List[NetworkSimulator], output_dir: str = "results"
 ) -> Dict[str, List[float]]:
-    """Compare metrics from different schedulers.
+    """Compare metrics from different routers.
 
     Args:
-        simulators: List of NetworkSimulator instances with different schedulers.
+        simulators: List of NetworkSimulator instances with different routers.
         output_dir: Directory to save output files.
 
     Returns:
         Dictionary of metric comparisons.
     """
     metrics_list = [sim.metrics for sim in simulators]
-    scheduler_types = [sim.scheduler_type for sim in simulators]
+    router_types = [sim.router_type for sim in simulators]
 
     # Save metrics to files
     save_metrics_to_csv(
-        metrics_list, scheduler_types, f"{output_dir}/metrics_comparison.csv"
+        metrics_list, router_types, f"{output_dir}/metrics_comparison.csv"
     )
-
-    for i, sim in enumerate(simulators):
-        save_metrics_to_json(
-            sim.metrics, f"{output_dir}/{sim.scheduler_type.lower()}_metrics.json"
-        )
 
     # Create comparison dictionary
     comparison = {
-        "scheduler_types": scheduler_types,
+        "router_types": router_types,
         "throughput": [m["throughput"] for m in metrics_list],
         "average_delay": [m["average_delay"] for m in metrics_list],
         "packet_loss_rate": [m["packet_loss_rate"] for m in metrics_list],

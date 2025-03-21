@@ -16,7 +16,6 @@ class Packet:
         source: Source node ID.
         destination: Destination node ID.
         size: Size of packet in bytes.
-        priority: Priority level (higher means more important).
         creation_time: Time when packet was created.
         id: Unique identifier for the packet.
         current_node: Current node where the packet is located.
@@ -30,14 +29,15 @@ class Packet:
     source: int
     destination: int
     size: int
-    priority: int = 0
     creation_time: float = 0
     id: int = field(init=False)
     current_node: int = field(init=False)
     hops: List[Tuple[int, float]] = field(default_factory=list)
     arrival_time: Optional[float] = None
     dropped: bool = False
-    queuing_delays: List[float] = field(default_factory=list)
+    queuing_delays: List[Tuple[int, float]] = field(default_factory=list)
+    routing_delays: List[Tuple[int, float]] = field(default_factory=list)
+    link_delays: List[Tuple[Tuple[int, int], float]] = field(default_factory=list)
     flow_id: str = field(init=False)
 
     _id_counter: int = field(default=0, init=False, repr=False)
@@ -59,13 +59,29 @@ class Packet:
         self.hops.append((node, time))
         self.current_node = node
 
-    def record_queuing_delay(self, delay: float) -> None:
+    def record_queuing_delay(self, node: int, delay: float) -> None:
         """Record queuing delay at a node.
 
         Args:
             delay: Queuing delay in seconds.
         """
-        self.queuing_delays.append(delay)
+        self.queuing_delays.append((node, delay))
+
+    def record_routing_delay(self, node: int, delay: float) -> None:
+        """Record queuing delay at a node.
+
+        Args:
+            delay: Queuing delay in seconds.
+        """
+        self.routing_delays.append((node, delay))
+
+    def record_link_delay(self, node: int, next_node: int, delay: float) -> None:
+        """Record queuing delay at a node.
+
+        Args:
+            delay: Queuing delay in seconds.
+        """
+        self.link_delays.append(((node, next_node), delay))
 
     def get_total_delay(self) -> Optional[float]:
         """Calculate total delay if packet has arrived.

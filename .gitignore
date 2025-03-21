@@ -12,7 +12,6 @@ build/
 venv/
 env/
 ENV/
-.env/
 .venv/
 
 # IDE specific files
@@ -43,10 +42,6 @@ results/
 
 # Environments
 .env
-.venv
-env/
-venv/
-ENV/
 env.bak/
 venv.bak/
 
@@ -64,9 +59,6 @@ docs/_build/
 # PyBuilder
 target/
 
-# Jupyter Notebook
-.ipynb_checkpoints
-
 # IPython
 profile_default/
 ipython_config.py
@@ -81,4 +73,4 @@ ipython_config.py
 
 .ruff_cache/
 # Exceptions - keep specific files/folders
-!results/.gitkeep 
+!results/.gitkeep
