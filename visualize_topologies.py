@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """Visualize different network topologies used in the Q-learning routing experiments."""
 
-import networkx as nx
-import matplotlib.pyplot as plt
-from typing import List, Tuple
-import random
 from collections import defaultdict
+from typing import List, Tuple
+import matplotlib.pyplot as plt
+import networkx as nx
 import numpy as np
+import os
+import random
 
 
 def generate_bottleneck_graph(
@@ -92,7 +93,12 @@ def generate_scale_free_graph(n: int, m: int = 2) -> List[Tuple[int, int]]:
     return edges
 
 
-def visualize_topology(edges: List[Tuple[int, int]], title: str, filename: str):
+def visualize_topology(
+    edges: List[Tuple[int, int]],
+    title: str,
+    output_dir: str,
+    filename: str
+):
     """Visualize a network topology using networkx and matplotlib."""
     G = nx.Graph()
     G.add_edges_from(edges)
@@ -110,7 +116,7 @@ def visualize_topology(edges: List[Tuple[int, int]], title: str, filename: str):
 
     plt.title(title, pad=20)
     plt.axis("off")
-    plt.savefig(f"results/{filename}.png", bbox_inches="tight", dpi=300)
+    plt.savefig(os.path.join(output_dir, f"{filename}.png"), bbox_inches="tight", dpi=300)
     plt.close()
 
 
@@ -119,17 +125,17 @@ def main():
     # Set random seed for reproducibility
     random.seed(42)
     np.random.seed(42)
+    
+    output_dir = "results"
 
-    # Create results directory if it doesn't exist
-    import os
-
-    os.makedirs("results", exist_ok=True)
+    os.makedirs(output_dir, exist_ok=True)
 
     # Generate and visualize bottleneck topology
     bottleneck_edges = generate_bottleneck_graph(10, 0.3)
     visualize_topology(
         bottleneck_edges,
         "Bottleneck Network Topology\n(10 nodes, 0.3 bottleneck factor)",
+        output_dir,
         "bottleneck_topology",
     )
 
@@ -138,16 +144,20 @@ def main():
     visualize_topology(
         ring_edges,
         "Ring Network with Cross Connections\n(12 nodes, 4 cross links)",
+        output_dir,
         "ring_topology",
     )
 
     # Generate and visualize scale-free topology
     scale_free_edges = generate_scale_free_graph(15, 2)
     visualize_topology(
-        scale_free_edges, "Scale-Free Network\n(15 nodes, m=2)", "scale_free_topology"
+        scale_free_edges,
+        "Scale-Free Network\n(15 nodes, m=2)",
+        output_dir,
+        "scale_free_topology"
     )
 
-    print("Topology visualizations have been saved to the 'results' directory.")
+    print(f"Topology visualizations have been saved to the '{output_dir}' directory.")
 
 
 if __name__ == "__main__":

@@ -26,11 +26,11 @@ from network_sim.utils.metrics import (
     calculate_fairness_index,
 )
 
-
 def simulator_creator(
     num_nodes,
     excess_edges,
     num_generators,
+    output_dir: str,
     router_time_scale=1.0,
     ql_params = {},
     seed=42,
@@ -106,7 +106,7 @@ def simulator_creator(
         return simulator
 
     simulator = instantiate_simulator("Dijkstra")
-    save_network_visualization(simulator, "results/topology.png")
+    save_network_visualization(simulator, os.path.join(output_dir, "topology.png"))
 
     return instantiate_simulator
 
@@ -135,6 +135,8 @@ def run_simulation(
 def main():
     """Run simulations with different routers and compare results."""
 
+    output_dir = "results"
+
     # Topology parameters
     num_nodes = 8
     excess_edges = 10
@@ -162,7 +164,15 @@ def main():
     #     "bin_base": 20,
     # }
 
-    simulator_func = simulator_creator(num_nodes, excess_edges, num_generators, router_time_scale, ql_params, log=True)
+    simulator_func = simulator_creator(
+        num_nodes,
+        excess_edges,
+        num_generators,
+        output_dir,
+        router_time_scale,
+        ql_params,
+        log=True
+    )
 
     simulators = []
     metrics_list = []
@@ -172,10 +182,8 @@ def main():
         simulators.append(simulator)
         metrics_list.append(simulator.metrics)
 
-        save_metrics_to_json(simulator.metrics, f"results/{router.lower()}_metrics.json")
-        plot_link_utilization(
-            simulator, f"results/{router.lower()}_link_utilization.png"
-        )
+        save_metrics_to_json(simulator.metrics, output_dir, f"{router.lower()}_metrics")
+        plot_link_utilization(simulator, output_dir, f"{router.lower()}_link_utilization")
 
         delay = simulator.metrics["average_delay"]
         packet_loss = simulator.metrics["packet_loss_rate"]
@@ -187,11 +195,11 @@ def main():
             print("Number of packets:", len(simulator.packets))
             print(counter)
 
-    compare_routers(simulators)
+    compare_routers(simulators, output_dir)
 
-    plot_metrics(metrics_list, routers)
+    plot_metrics(metrics_list, routers, output_dir)
 
-    print("\nSimulation complete. Results saved to 'results' directory.")
+    print(f"\nSimulation complete. Results saved to '{output_dir}' directory.")
 
 
 if __name__ == "__main__":

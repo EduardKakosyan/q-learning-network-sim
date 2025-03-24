@@ -15,13 +15,15 @@ from network_sim.core.simulator import NetworkSimulator
 
 
 def save_network_visualization(
-    simulator: NetworkSimulator, filename: str, figsize: Tuple[int, int] = (10, 8)
+    simulator: NetworkSimulator,
+    filename: str | None = None,
+    figsize: Tuple[int, int] = (10, 8)
 ) -> None:
     """Save network topology visualization to a file.
 
     Args:
         simulator: NetworkSimulator instance.
-        filename: Output filename.
+        filename: Output filename, or None to show it immediately.
         figsize: Figure size as (width, height) in inches.
     """
     fig = plt.figure(figsize=figsize)
@@ -54,15 +56,18 @@ def save_network_visualization(
     plt.axis("off")
     plt.tight_layout()
 
-    os.makedirs(os.path.dirname(filename), exist_ok=True)
-    fig.savefig(filename)
+    if filename:
+        os.makedirs(os.path.dirname(filename), exist_ok=True)
+        fig.savefig(filename)
+    else:
+        plt.show()    
     plt.close(fig)
 
 
 def plot_metrics(
     metrics_list: List[Dict[str, Any]],
     router_types: List[str],
-    output_dir: str = "results",
+    output_dir: str | None,
 ) -> None:
     """Plot and save performance metrics for different routers.
 
@@ -71,7 +76,15 @@ def plot_metrics(
         router_types: List of router types corresponding to metrics_list.
         output_dir: Directory to save output plots.
     """
-    os.makedirs(output_dir, exist_ok=True)
+    if output_dir:
+        os.makedirs(output_dir, exist_ok=True)
+    
+    def show_fig(filename: str):
+        if output_dir:
+            plt.savefig(os.path.join(output_dir, filename))
+        else:
+            plt.show()
+        plt.close()
 
     # Throughput comparison
     plt.figure(figsize=(10, 6))
@@ -80,8 +93,7 @@ def plot_metrics(
     plt.title("Throughput Comparison")
     plt.ylabel("Throughput (bytes/second)")
     plt.xlabel("Router Type")
-    plt.savefig(f"{output_dir}/throughput_comparison.png")
-    plt.close()
+    show_fig("throughput_comparison.png")
 
     # Delay comparison
     plt.figure(figsize=(10, 6))
@@ -90,8 +102,7 @@ def plot_metrics(
     plt.title("Average Delay Comparison")
     plt.ylabel("Average Delay (seconds)")
     plt.xlabel("Router Type")
-    plt.savefig(f"{output_dir}/delay_comparison.png")
-    plt.close()
+    show_fig("delay_comparison.png")
 
     # Packet loss rate comparison
     plt.figure(figsize=(10, 6))
@@ -100,18 +111,20 @@ def plot_metrics(
     plt.title("Packet Loss Rate Comparison")
     plt.ylabel("Packet Loss Rate")
     plt.xlabel("Router Type")
-    plt.savefig(f"{output_dir}/loss_rate_comparison.png")
-    plt.close()
+    show_fig("loss_rate_comparison.png")
 
 
 def plot_link_utilization(
-    simulator: NetworkSimulator, output_file: str = "results/link_utilization.png"
+    simulator: NetworkSimulator,
+    output_dir: str | None,
+    filename: str | None,
 ) -> None:
     """Plot and save link utilization.
 
     Args:
         simulator: NetworkSimulator instance.
         output_file: Output filename.
+        filename: The filename for the file.
     """
     link_utilization = simulator.metrics["link_utilization"]
     if not link_utilization:
@@ -128,24 +141,27 @@ def plot_link_utilization(
     plt.xticks(rotation=45)
     plt.tight_layout()
 
-    os.makedirs(os.path.dirname(output_file), exist_ok=True)
-    plt.savefig(output_file)
+    if output_dir:
+        os.makedirs(output_dir, exist_ok=True)
+        plt.savefig(os.path.join(output_dir, f"{filename}.png"))
+    else:
+        plt.show()
     plt.close()
 
 
 def plot_packet_journey(
     simulator: NetworkSimulator,
+    output_dir: str | None,
     packet_ids: Optional[List[int]] = None,
     max_packets: int = 10,
-    output_file: str = "results/packet_journey.png",
 ) -> None:
     """Plot and save packet journey through the network.
 
     Args:
         simulator: NetworkSimulator instance.
+        output_dir: Output directory.
         packet_ids: List of packet IDs to plot (if None, selects random completed packets).
         max_packets: Maximum number of packets to plot.
-        output_file: Output filename.
     """
     completed_packets = simulator.completed_packets
     if not completed_packets:
@@ -190,6 +206,9 @@ def plot_packet_journey(
     plt.grid(True, linestyle="--", alpha=0.7)
     plt.legend()
 
-    os.makedirs(os.path.dirname(output_file), exist_ok=True)
-    plt.savefig(output_file)
+    if output_dir:
+        os.makedirs(output_dir, exist_ok=True)
+        plt.savefig(os.path.join(output_dir, "packet_journey.png"))
+    else:
+        plt.show()
     plt.close()

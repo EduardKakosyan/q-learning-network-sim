@@ -13,15 +13,17 @@ from network_sim.core.simulator import NetworkSimulator
 
 
 def save_metrics_to_json(
-    metrics: Dict[str, Any], filename: str = "results/metrics.json"
+    metrics: Dict[str, Any],
+    output_dir: str,
+    filename: str,
 ) -> None:
     """Save metrics to a JSON file.
 
     Args:
         metrics: Dictionary of metrics to save.
-        filename: Output filename.
+        output_dir: Output directory.
+        filename: The name for the file.
     """
-    os.makedirs(os.path.dirname(filename), exist_ok=True)
 
     # Convert non-serializable types
     serializable_metrics = {}
@@ -37,6 +39,8 @@ def save_metrics_to_json(
         else:
             serializable_metrics[key] = value
 
+    os.makedirs(output_dir, exist_ok=True)
+    filename = os.path.join(output_dir, f"{filename}.json")
     with open(filename, "w") as f:
         json.dump(serializable_metrics, f, indent=2)
 
@@ -44,18 +48,20 @@ def save_metrics_to_json(
 def save_metrics_to_csv(
     metrics_list: List[Dict[str, Any]],
     router_types: List[str],
-    filename: str = "results/metrics_comparison.csv",
+    output_dir: str,
+    filename: str,
 ) -> None:
     """Save comparison of metrics from different routers to a CSV file.
 
     Args:
         metrics_list: List of metrics dictionaries from different simulations.
         router_types: List of router types corresponding to metrics_list.
-        filename: Output filename.
+        output_dir: Output directory.
+        filename: The filename for the file.
     """
-    os.makedirs(os.path.dirname(filename), exist_ok=True)
-
-    with open(filename, "w", newline="") as f:
+    os.makedirs(output_dir, exist_ok=True)
+    filepath = os.path.join(output_dir, f"{filename}.csv")
+    with open(filepath, "w", newline="") as f:
         writer = csv.writer(f)
 
         # Write header
@@ -76,7 +82,8 @@ def save_metrics_to_csv(
 
 
 def compare_routers(
-    simulators: List[NetworkSimulator], output_dir: str = "results"
+    simulators: List[NetworkSimulator],
+    output_dir: str
 ) -> Dict[str, List[float]]:
     """Compare metrics from different routers.
 
@@ -92,7 +99,7 @@ def compare_routers(
 
     # Save metrics to files
     save_metrics_to_csv(
-        metrics_list, router_types, f"{output_dir}/metrics_comparison.csv"
+        metrics_list, router_types, output_dir, "metrics_comparison.csv"
     )
 
     # Create comparison dictionary
