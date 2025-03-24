@@ -52,7 +52,6 @@ def save_network_visualization(
         graph, pos, edge_labels=edge_labels, font_size=8
     )
 
-    plt.title(f"Network Topology (Router: {simulator.router_type})")
     plt.axis("off")
     plt.tight_layout()
 
@@ -67,7 +66,7 @@ def save_network_visualization(
 def plot_metrics(
     metrics_list: List[Dict[str, Any]],
     router_types: List[str],
-    output_dir: str | None,
+    output_dir: str | None = None,
 ) -> None:
     """Plot and save performance metrics for different routers.
 
@@ -116,8 +115,8 @@ def plot_metrics(
 
 def plot_link_utilization(
     simulator: NetworkSimulator,
-    output_dir: str | None,
-    filename: str | None,
+    output_dir: str | None = None,
+    filename: str | None = None,
 ) -> None:
     """Plot and save link utilization.
 

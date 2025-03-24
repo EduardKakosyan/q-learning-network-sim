@@ -8,13 +8,17 @@ a simple network simulation with different routers.
 from collections import Counter
 import os
 import random
-from typing import Callable, List, Tuple
+from typing import Any, Callable, Dict, List, Tuple
 import numpy as np
 import simpy
 
 from network_sim.core.simulator import NetworkSimulator
 from network_sim.core.routing_algorithms import router_factory
-from network_sim.traffic.generators import bimodal_size, bursty_traffic, constant_traffic, constant_size, pareto_traffic, poisson_traffic
+from network_sim.traffic.generators import (
+    bimodal_size,
+    bursty_traffic,
+    poisson_traffic
+)
 from network_sim.utils.visualization import (
     save_network_visualization,
     plot_metrics,
@@ -27,14 +31,14 @@ from network_sim.utils.metrics import (
 )
 
 def simulator_creator(
-    num_nodes,
-    excess_edges,
-    num_generators,
-    output_dir: str,
-    router_time_scale=1.0,
-    ql_params = {},
-    seed=42,
-    log=False,
+    num_nodes: int,
+    excess_edges: int,
+    num_generators : int,
+    router_time_scale = 1.0,
+    ql_params: Dict[str, Any] = {},
+    seed = 42,
+    output_dir: str | None = None,
+    log = False,
 ) -> Callable[[str], NetworkSimulator]:
     random.seed(seed)
     np.random.seed(seed)
@@ -80,7 +84,7 @@ def simulator_creator(
         print("Generators:")
         print(node_pairs)
 
-    def instantiate_simulator(router_type: str) -> NetworkSimulator:
+    def instantiate_simulator(router_type: str, link_size_scale = 5) -> NetworkSimulator:
         env = simpy.Environment()
         simulator = NetworkSimulator(env, router_type)
 
@@ -91,7 +95,7 @@ def simulator_creator(
             simulator.add_node(node, router_func=create_router, buffer_size=1e4, time_scale=router_time_scale)
 
         for edge, delay in zip(edges, link_delays):
-            simulator.add_link(edge[0], edge[1], 5e4, delay)
+            simulator.add_link(edge[0], edge[1], 1e4 * link_size_scale, delay)
 
         simulator.compute_shortest_paths()
 
@@ -106,7 +110,7 @@ def simulator_creator(
         return simulator
 
     simulator = instantiate_simulator("Dijkstra")
-    save_network_visualization(simulator, os.path.join(output_dir, "topology.png"))
+    save_network_visualization(simulator, os.path.join(output_dir, "topology.png") if output_dir else None)
 
     return instantiate_simulator
 
@@ -168,9 +172,9 @@ def main():
         num_nodes,
         excess_edges,
         num_generators,
-        output_dir,
         router_time_scale,
         ql_params,
+        output_dir=output_dir,
         log=True
     )
 
