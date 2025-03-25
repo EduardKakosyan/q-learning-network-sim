@@ -54,6 +54,7 @@ class NetworkSimulator:
         self.active_packet_ids: Set[int] = set()
         self.completed_packets: List[Packet] = []
         self.dropped_packets: List[Tuple[Packet, str]] = []
+        self.generators: List[Tuple[int, int]] = []
 
         random.seed(seed)
         np.random.seed(seed)
@@ -183,6 +184,8 @@ class NetworkSimulator:
             SimPy process for the packet generator.
         """
 
+        self.generators.append((source, destination))
+        
         def generator_process():
             while True:
                 current_interval = interval()

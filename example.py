@@ -6,10 +6,11 @@ a simple network simulation with different routers.
 """
 
 from collections import Counter
-import os
-import random
+from pprint import pprint
 from typing import Any, Callable, Dict, List, Tuple
 import numpy as np
+import os
+import random
 import simpy
 
 from network_sim.core.simulator import NetworkSimulator
@@ -22,7 +23,7 @@ from network_sim.traffic.generators import (
 from network_sim.utils.visualization import (
     save_network_visualization,
     plot_metrics,
-    plot_link_utilization,
+    plot_link_utilizations,
 )
 from network_sim.utils.metrics import (
     save_metrics_to_json,
@@ -39,6 +40,7 @@ def simulator_creator(
     seed = 42,
     output_dir: str | None = None,
     log = False,
+    block = True,
 ) -> Callable[[str], NetworkSimulator]:
     random.seed(seed)
     np.random.seed(seed)
@@ -84,7 +86,7 @@ def simulator_creator(
         print("Generators:")
         print(node_pairs)
 
-    def instantiate_simulator(router_type: str, link_size_scale = 5) -> NetworkSimulator:
+    def instantiate_simulator(router_type: str, packet_scale = 5) -> NetworkSimulator:
         env = simpy.Environment()
         simulator = NetworkSimulator(env, router_type)
 
@@ -95,7 +97,7 @@ def simulator_creator(
             simulator.add_node(node, router_func=create_router, buffer_size=1e4, time_scale=router_time_scale)
 
         for edge, delay in zip(edges, link_delays):
-            simulator.add_link(edge[0], edge[1], 1e4 * link_size_scale, delay)
+            simulator.add_link(edge[0], edge[1], 1e5, delay)
 
         simulator.compute_shortest_paths()
 
@@ -103,14 +105,14 @@ def simulator_creator(
             simulator.packet_generator(
                 source=source,
                 destination=destination,
-                packet_size=bimodal_size(10, 100, 0.8),
+                packet_size=bimodal_size(10 * packet_scale, 100 * packet_scale, 0.8),
                 interval=bursty_traffic(5, poisson_traffic(100)),
             )
 
         return simulator
 
     simulator = instantiate_simulator("Dijkstra")
-    save_network_visualization(simulator, os.path.join(output_dir, "topology.png") if output_dir else None)
+    save_network_visualization(simulator, os.path.join(output_dir, "topology.png") if output_dir else None, block=block)
 
     return instantiate_simulator
 
@@ -187,20 +189,22 @@ def main():
         metrics_list.append(simulator.metrics)
 
         save_metrics_to_json(simulator.metrics, output_dir, f"{router.lower()}_metrics")
-        plot_link_utilization(simulator, output_dir, f"{router.lower()}_link_utilization")
 
         delay = simulator.metrics["average_delay"]
         packet_loss = simulator.metrics["packet_loss_rate"]
         throughput = simulator.metrics["throughput"]
         fairness = calculate_fairness_index(simulator)
-        print(f"Fairness index: {fairness:.4f}")
+        print(f"  Average Delay:  {delay:.2f} s")
+        print(f"  Packet loss:    {packet_loss * 100:.2f}%")
+        print(f"  Throughput:     {int(throughput)} packets")
+        print(f"  Fairness index: {fairness:.4f}")
         if simulator.dropped_packets:
             counter = Counter([f"{packet.current_node}: {reason}" for packet, reason in simulator.dropped_packets])
-            print("Number of packets:", len(simulator.packets))
-            print(counter)
+            print("  Number of packets:", len(simulator.packets))
+            pprint(counter.items())
 
     compare_routers(simulators, output_dir)
-
+    plot_link_utilizations(metrics_list, output_dir, "link_utilizations")
     plot_metrics(metrics_list, routers, output_dir)
 
     print(f"\nSimulation complete. Results saved to '{output_dir}' directory.")

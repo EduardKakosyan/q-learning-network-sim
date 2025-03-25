@@ -7,7 +7,7 @@ This module defines the Node class, which represents a network node
 from collections import deque
 import time
 import simpy
-from typing import Callable, Deque, Dict, Tuple
+from typing import Callable, Deque, Dict, List, Tuple
 
 from network_sim.core.link import Link
 from network_sim.core.packet import Packet
@@ -59,6 +59,14 @@ class Node:
         self.queue: Deque[Packet] = deque()
         self.resource = simpy.Resource(env, capacity=1)
         self.neighbours: Dict[int, Node] = {}
+        self.buffer_usage_history: List[Tuple[float, float]] = []
+        
+        def update():
+            while True:
+                yield self.env.timeout(0.1)
+                self.buffer_usage_history.append((self.env.now, self.buffer_usage()))
+
+        self.env.process(update())
 
     def add_link(self, link: Link, node) -> None:
         """Add an outgoing link from this node.
