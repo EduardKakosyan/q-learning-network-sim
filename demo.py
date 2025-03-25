@@ -1,3 +1,4 @@
+import argparse
 from collections import Counter
 from pprint import pprint
 import random
@@ -10,7 +11,9 @@ from network_sim.utils.visualization import plot_buffer_usages, plot_link_utiliz
 
 
 def main():
-    """Run the specific simulations for the demo to compare results."""
+    parser = argparse.ArgumentParser(description="Run the specific simulations for the demo to compare results.")
+    parser.add_argument("--last", action="store_true", help="Skip every iteration except the last item from both for loops")
+    args = parser.parse_args()
 
     # Topology parameters
     num_nodes = 8
@@ -32,8 +35,17 @@ def main():
     
     seed = random.randint(0, 2**32 - 1)
     print("Seed:", seed)
+    # seed = 3225047426 # Decent
+    # seed = 2845411063 # Amazing
 
-    for excess_edges in [4, 15]:
+    excess_edges_list = [4, 15]
+    packet_scale_list = [1, 3]
+
+    if args.last:
+        excess_edges_list = [excess_edges_list[-1]]
+        packet_scale_list = [packet_scale_list[-1]]
+
+    for excess_edges in excess_edges_list:
         simulator_func = simulator_creator(
             num_nodes,
             excess_edges,
@@ -45,7 +57,7 @@ def main():
         )
         graph_fig_manager = plt.get_current_fig_manager()
         input("Press enter to continue")
-        for packet_scale in [1, 3]:
+        for packet_scale in packet_scale_list:
             simulator_list = []
             metrics_list = []
             print(f"\nRunning simulations with excess_edges={excess_edges} and packet_scale={packet_scale}")
@@ -70,11 +82,11 @@ def main():
                     print("  Number of packets:", len(simulator.packets))
                     pprint(dict({k: v for k, v in counter.items()}))
 
-            plot_link_utilizations(metrics_list, show=False)
-            fig_manager_1 = plt.get_current_fig_manager()
-            plot_packet_journeys(simulator_list, show=False)
-            fig_manager_2 = plt.get_current_fig_manager()
             plot_buffer_usages(simulator_list, show=False)
+            fig_manager_1 = plt.get_current_fig_manager()
+            plot_link_utilizations(metrics_list, show=False)
+            fig_manager_2 = plt.get_current_fig_manager()
+            plot_packet_journeys(simulator_list, show=False)
             fig_manager_3 = plt.get_current_fig_manager()
             plot_metrics(metrics_list, show=False)
             fig_manager_4 = plt.get_current_fig_manager()
