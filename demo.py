@@ -14,24 +14,22 @@ def main():
 
     # Topology parameters
     num_nodes = 8
-    num_generators = 5
+    num_generators = 4
 
     # Simulation parameters
-    packet_scales = [1, 2, 3]
     routers = ["Dijkstra", "LCF", "QL"]
     router_time_scale = 0.0
     duration = 10.0
 
     # The best Q Learning parameters:
     ql_params = {
-        "learning_rate": 0.1,
+        "learning_rate": 0.5,
         "discount_factor": 0.99,
-        "exploration_rate": 0.0,
-        "exploration_rate": 0.5,
+        "exploration_rate": 0.1,
         "bins": 4,
-        "bin_base": 20,
+        "bin_base": 10
     }
-
+    
     seed = random.randint(0, 2**32 - 1)
     print("Seed:", seed)
 
@@ -46,7 +44,8 @@ def main():
             block=False
         )
         graph_fig_manager = plt.get_current_fig_manager()
-        for packet_scale in packet_scales:
+        input("Press enter to continue")
+        for packet_scale in [1, 3]:
             simulator_list = []
             metrics_list = []
             print(f"\nRunning simulations with excess_edges={excess_edges} and packet_scale={packet_scale}")

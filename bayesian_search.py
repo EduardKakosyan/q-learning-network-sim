@@ -1,26 +1,28 @@
 #!/usr/bin/env python3
 """Hyper-parameter search for Q-learning router using Optuna."""
 
+import random
 import optuna
 
 from example import simulator_creator
-from network_sim.utils.metrics import calculate_fairness_index
+
+seed = random.randint(0, 2**32 - 1)
 
 def objective(trial: optuna.Trial):
     # Topology parameters
     num_nodes = 8
-    excess_edges = 18
-    num_generators = 5
+    excess_edges = 15
+    num_generators = 4
 
     # Simulation parameters
-    router_time_scale = 1.0
+    router_time_scale = 0.0
     duration = 10.0
 
     # Q Learning parameters
     param_grid = {
         "learning_rate": [0.01, 0.1, 0.2, 0.5],
         "discount_factor": [0.8, 0.9, 0.99],
-        "exploration_rate": [0.01, 0.1, 0.2],
+        "exploration_rate": [0.01, 0.1, 0.2, 0.5],
         "bins": [4, 8, 16],
         "bin_base": [10, 20, 30],
     }
@@ -34,21 +36,27 @@ def objective(trial: optuna.Trial):
         "bin_base": get("bin_base"),
     }
 
-    simulator_func = simulator_creator(num_nodes, excess_edges, num_generators, router_time_scale, ql_params)
-    simulator = simulator_func("QL")
+    simulator_func = simulator_creator(
+        num_nodes,
+        excess_edges,
+        num_generators,
+        router_time_scale,
+        ql_params,
+        seed=seed,
+        show=False,
+    )
+    simulator = simulator_func("QL", 4)
 
     simulator.run(duration, updates=True)
 
     delay = simulator.metrics["average_delay"]
     packet_loss = simulator.metrics["packet_loss_rate"]
     throughput = simulator.metrics["throughput"]
-    fairness = calculate_fairness_index(simulator)
 
-    # Objective is to minimize delay and packet loss, and maximize throughput and fairness
-    return delay, packet_loss, throughput, fairness
+    return delay, packet_loss, throughput
 
 def main():
-    study = optuna.create_study(directions=["minimize", "minimize", "maximize", "maximize"])
+    study = optuna.create_study(directions=["minimize", "minimize", "maximize"])
     study.optimize(objective, n_trials=100)
 
     best_trials = study.best_trials

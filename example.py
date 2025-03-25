@@ -40,8 +40,9 @@ def simulator_creator(
     seed = 42,
     output_dir: str | None = None,
     log = False,
+    show = True,
     block = True,
-) -> Callable[[str], NetworkSimulator]:
+) -> Callable[[str, int], NetworkSimulator]:
     random.seed(seed)
     np.random.seed(seed)
 
@@ -78,15 +79,16 @@ def simulator_creator(
         node_pairs.append((source, destination))
         if len(node_pairs) >= num_generators:
             break
-        possible_node_pairs = [pair for pair in possible_node_pairs if pair[0] != source]
+        possible_node_pairs = [pair for pair in possible_node_pairs if pair[0] != source and pair[1] != destination]
     else:
-        raise ValueError(f"Cannot generate {num_generators} node pairs. Max is {len(node_pairs)}")
+        if len(node_pairs) != num_generators:
+            raise ValueError(f"Cannot generate {num_generators} node pairs. Max is {len(node_pairs)}")
 
     if log:
         print("Generators:")
         print(node_pairs)
 
-    def instantiate_simulator(router_type: str, packet_scale = 5) -> NetworkSimulator:
+    def instantiate_simulator(router_type: str, packet_scale: int = 5) -> NetworkSimulator:
         env = simpy.Environment()
         simulator = NetworkSimulator(env, router_type)
 
@@ -111,8 +113,9 @@ def simulator_creator(
 
         return simulator
 
-    simulator = instantiate_simulator("Dijkstra")
-    save_network_visualization(simulator, os.path.join(output_dir, "topology.png") if output_dir else None, block=block)
+    if show:
+        simulator = instantiate_simulator("Dijkstra")
+        save_network_visualization(simulator, os.path.join(output_dir, "topology.png") if output_dir else None, block=block)
 
     return instantiate_simulator
 

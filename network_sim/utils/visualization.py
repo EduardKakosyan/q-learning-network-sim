@@ -95,7 +95,7 @@ def plot_metrics(
     x = np.arange(len(router_types))
 
     # Throughput subplot
-    axes[0].bar(x, throughputs, width=0.4)
+    axes[0].bar(x, throughputs)
     axes[0].set_ylabel('Throughput (packets)')
     axes[0].set_title('Throughput Comparison')
     axes[0].set_xlabel('Router Type')
@@ -103,7 +103,7 @@ def plot_metrics(
     axes[0].set_xticklabels(router_types)
 
     # Average Delay subplot
-    axes[1].bar(x, delays, width=0.4, color='orange')
+    axes[1].bar(x, delays, color='orange')
     axes[1].set_ylabel('Average Delay (seconds)')
     axes[1].set_title('Average Delay Comparison')
     axes[1].set_xlabel('Router Type')
@@ -111,7 +111,7 @@ def plot_metrics(
     axes[1].set_xticklabels(router_types)
 
     # Packet Loss Rate subplot
-    axes[2].bar(x, loss_rates, width=0.4, color='green')
+    axes[2].bar(x, loss_rates, color='green')
     axes[2].set_ylabel('Packet Loss Rate')
     axes[2].set_title('Packet Loss Rate Comparison')
     axes[2].set_xlabel('Router Type')
@@ -119,7 +119,7 @@ def plot_metrics(
     axes[2].set_xticklabels(router_types)
     axes[2].set_ylim(0, 1)
 
-    plt.tight_layout()
+    plt.tight_layout(rect=[0.05, 0, 0.95, 1])
 
     if output_dir:
         os.makedirs(output_dir, exist_ok=True)
@@ -157,12 +157,13 @@ def plot_link_utilizations(
         ax.bar(links, utilizations)
         ax.set_title(f"Link Utilization (Router: {metrics['router_type']})")
         ax.set_ylabel("Utilization")
+        ax.set_ylim(0, 1)
         if i == num_metrics - 1:
             ax.set_xlabel("Link")
             ax.set_xticks(range(len(links)))
             ax.set_xticklabels(links, rotation=45)
 
-    plt.tight_layout(rect=[0, 0.02, 1, 0.98], h_pad=3)
+    plt.tight_layout(rect=[0, 0.1, 1, 0.95], h_pad=4)
 
     if output_dir:
         os.makedirs(output_dir, exist_ok=True)
@@ -220,11 +221,13 @@ def plot_packet_journeys(
 
         ax.set_title(f"Packet Journey Through Network (Router: {simulator.router_type})")
         ax.set_ylabel("Node ID")
+        ax.set_ylim(0, len(simulator.nodes) + 1)
+        ax.yaxis.set_major_locator(plt.MaxNLocator(integer=True))
         ax.grid(True, linestyle="--", alpha=0.7)
         if i == num_simulators - 1:
             ax.set_xlabel("Simulation Time (seconds)")
 
-    plt.tight_layout(rect=[0, 0.05, 1, 0.98], h_pad=3)
+    plt.tight_layout(rect=[0, 0.05, 1, 0.95], h_pad=3)
     
     if output_dir:
         os.makedirs(output_dir, exist_ok=True)
@@ -260,11 +263,11 @@ def plot_buffer_usages(
         ax.set_ylabel("Buffer Usage")
         ax.set_ylim(0, 1)
         ax.grid(True, linestyle="--", alpha=0.7)
-        ax.legend()
         if i == num_simulators - 1:
+            ax.legend()
             ax.set_xlabel("Simulation Time (seconds)")
 
-    plt.tight_layout(rect=[0, 0.07, 1, 0.98], h_pad=3)
+    plt.tight_layout(rect=[0.05, 0.07, 0.95, 0.95], h_pad=3)
 
     if output_dir:
         os.makedirs(output_dir, exist_ok=True)
