@@ -39,13 +39,12 @@ def main():
     # seed = 2845411063 # Amazing
 
     excess_edges_list = [4, 15]
-    packet_scale_list = [1, 3]
 
     if args.last:
         excess_edges_list = [excess_edges_list[-1]]
-        packet_scale_list = [packet_scale_list[-1]]
 
-    for excess_edges in excess_edges_list:
+    for i, excess_edges in enumerate(excess_edges_list):
+        print(f"\nCreating topology with excess_edges={excess_edges}")
         simulator_func = simulator_creator(
             num_nodes,
             excess_edges,
@@ -57,10 +56,17 @@ def main():
         )
         graph_fig_manager = plt.get_current_fig_manager()
         input("Press enter to continue")
+
+        # Set packet scale list based on the index of excess_edges
+        if i == 0 and not args.last:
+            packet_scale_list = [1, 3]
+        else:
+            packet_scale_list = [3]
+
         for packet_scale in packet_scale_list:
             simulator_list = []
             metrics_list = []
-            print(f"\nRunning simulations with excess_edges={excess_edges} and packet_scale={packet_scale}")
+            print(f"\nRunning simulations with packet_scale={packet_scale}")
             for router in routers:
                 print(f"\nRunning simulation with {router} router...")
                 simulator: NetworkSimulator = simulator_func(router, packet_scale)
