@@ -18,6 +18,8 @@ def constant_traffic(rate: float) -> Callable[[], float]:
     Returns:
         Function that returns constant interval between packets.
     """
+    if rate <= 0:
+        raise ValueError(f"Rate must be positive. Provided rate: {rate}.")
     return lambda: 1 / rate
 
 
@@ -31,6 +33,10 @@ def variable_traffic(min_rate: float, max_rate: float) -> Callable[[], float]:
     Returns:
         Function that returns variable interval between packets.
     """
+    if min_rate <= 0 or max_rate <= 0:
+        raise ValueError("Rates must be positive.")
+    if min_rate > max_rate:
+        raise ValueError(f"min_rate must be less than or equal to max_rate. Provided min_rate: {min_rate}, max_rate: {max_rate}.")
     return lambda: 1 / random.uniform(min_rate, max_rate)
 
 
@@ -43,6 +49,8 @@ def poisson_traffic(rate: float) -> Callable[[], float]:
     Returns:
         Function that returns exponentially distributed interval between packets.
     """
+    if rate <= 0:
+        raise ValueError(f"Rate must be positive. Provided rate: {rate}.")
     return lambda: np.random.exponential(1 / rate)
 
 
@@ -56,6 +64,12 @@ def pareto_traffic(rate: float, alpha: float = 1.5) -> Callable[[], float]:
     Returns:
         Function that returns Pareto distributed interval between packets.
     """
+    if rate <= 0:
+        raise ValueError(f"Rate must be positive. Provided rate: {rate}.")
+    if alpha <= 1:
+        raise ValueError(
+            "Alpha must be greater than 1 for a valid Pareto distribution."
+        )
     scale = (alpha - 1) / (alpha * rate)
     return lambda: np.random.pareto(alpha) * scale
 
@@ -70,17 +84,22 @@ def bursty_traffic(
     followed by a longer gap before the next burst starts.
 
     Args:
-        burst_size: Number of packets to send in each burst
+        burst_size: Number of packets to send in each burst.
         packet_interval: Time between packets within a burst, either as:
-            - Fixed float value in seconds
-            - Callable that returns variable intervals
+            - Fixed float value in seconds.
+            - Callable that returns variable intervals.
 
     Returns:
         Function that returns the time interval until the next packet should be sent:
-        - Returns 0 for first packet in burst (send immediately)
-        - Returns packet_interval for subsequent packets in burst
-        - Returns packet_interval * burst_size for gap between bursts
+        - Returns 0 for first packet in burst (send immediately).
+        - Returns packet_interval for subsequent packets in burst.
+        - Returns packet_interval * burst_size for gap between bursts.
     """
+    if burst_size <= 0:
+        raise ValueError(f"Burst size must be positive. Provided burst size: {burst_size}.")
+    if isinstance(packet_interval, float) and packet_interval <= 0:
+        raise ValueError(f"Packet interval must be positive. Provided interval: {packet_interval}.")
+
     get_interval = (
         packet_interval if callable(packet_interval) else lambda: packet_interval
     )
@@ -120,6 +139,8 @@ def constant_size(size: int) -> Callable[[], int]:
     Returns:
         Function that returns constant packet size.
     """
+    if size <= 0:
+        raise ValueError(f"Size must be positive. Provided size: {size}.")
     return lambda: size
 
 
@@ -133,6 +154,10 @@ def variable_size(min_size: int, max_size: int) -> Callable[[], int]:
     Returns:
         Function that returns random packet size between min_size and max_size.
     """
+    if min_size <= 0 or max_size <= 0:
+        raise ValueError("Sizes must be positive.")
+    if min_size > max_size:
+        raise ValueError(f"min_size must be less than or equal to max_size. Provided min_size: {min_size}, max_size: {max_size}.")
     return lambda: random.randint(min_size, max_size)
 
 
@@ -149,4 +174,8 @@ def bimodal_size(
     Returns:
         Function that returns either small_size or large_size with probability small_prob.
     """
+    if small_size <= 0 or large_size <= 0:
+        raise ValueError("Sizes must be positive.")
+    if not (0 <= small_prob <= 1):
+        raise ValueError(f"small_prob must be between 0 and 1. Provided small_prob: {small_prob}.")
     return lambda: small_size if random.random() < small_prob else large_size

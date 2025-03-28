@@ -114,7 +114,7 @@ class NetworkSimulator:
             Tuple of created Link objects.
         """
         if source not in self.nodes or destination not in self.nodes:
-            raise ValueError(f"Nodes {source} and/or {destination} do not exist")
+            raise ValueError(f"Nodes {source} and/or {destination} do not exist in the graph.")
 
         linkTo = Link(self.env, source, destination, capacity, propagation_delay)
         linkFrom = Link(self.env, destination, source, capacity, propagation_delay)
@@ -185,7 +185,7 @@ class NetworkSimulator:
         """
 
         self.generators.append((source, destination))
-        
+
         def generator_process():
             while True:
                 current_interval = interval()
@@ -240,7 +240,7 @@ class NetworkSimulator:
                 link = current_node.links.get(next_hop)
                 if link is None:
                     raise ValueError(
-                        "Who routed a packet to a node that isn't connected?"
+                        f"No link exists from node {current_node.id} to node {next_hop}. Check routing table configuration."
                     )
 
                 packet.record_routing_delay(current_node.id, routing_delay)
@@ -438,7 +438,7 @@ class NetworkSimulator:
             callback: The function to call when the event occurs.
         """
         if event_type not in self.hooks:
-            raise ValueError(f"Unknown hook type: {event_type}")
+            raise ValueError(f"Unknown hook type: {event_type}. Valid types are: {list(self.hooks.keys())}.")
         self.hooks[event_type].append(callback)
 
     def call_hooks(self, event_type: str, *args: Any, **kwargs: Any) -> None:
@@ -481,7 +481,7 @@ class NetworkSimulator:
             for packet_id in list(self.active_packet_ids):
                 packets = [p for p in self.packets if p.id == packet_id]
                 if len(packets) != 1:
-                    raise ValueError("Who made a packet with a duplicate id?")
+                    raise ValueError(f"Found {len(packets)} packets with ID {packet_id}. Each packet must have a unique ID.")
                 packet = packets[0]
                 self.packet_dropped(packet, "Simulation ended")
 

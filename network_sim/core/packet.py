@@ -42,7 +42,7 @@ class Packet:
 
     _id_counter: int = field(default=0, init=False, repr=False)
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Initialize derived attributes after initialization."""
         type(self)._id_counter += 1
         self.id = type(self)._id_counter
@@ -63,23 +63,27 @@ class Packet:
         """Record queuing delay at a node.
 
         Args:
+            node: Node ID where the delay occurred.
             delay: Queuing delay in seconds.
         """
         self.queuing_delays.append((node, delay))
 
     def record_routing_delay(self, node: int, delay: float) -> None:
-        """Record queuing delay at a node.
+        """Record routing delay at a node.
 
         Args:
-            delay: Queuing delay in seconds.
+            node: Node ID where the delay occurred.
+            delay: Routing delay in seconds.
         """
         self.routing_delays.append((node, delay))
 
     def record_link_delay(self, node: int, next_node: int, delay: float) -> None:
-        """Record queuing delay at a node.
+        """Record link delay between nodes.
 
         Args:
-            delay: Queuing delay in seconds.
+            node: Current node ID.
+            next_node: Next node ID.
+            delay: Link delay in seconds.
         """
         self.link_delays.append(((node, next_node), delay))
 

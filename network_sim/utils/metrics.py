@@ -24,6 +24,8 @@ def save_metrics_to_json(
         output_dir: Output directory.
         filename: The name for the file.
     """
+    if not metrics:
+        raise ValueError("Metrics dictionary is empty. Provide a non-empty dictionary of metrics.")
 
     # Convert non-serializable types
     serializable_metrics = {}
@@ -59,31 +61,33 @@ def save_metrics_to_csv(
         output_dir: Output directory.
         filename: The filename for the file.
     """
+    if not metrics_list or not router_types:
+        raise ValueError("Metrics list or router types are empty.")
+    if len(metrics_list) != len(router_types):
+        raise ValueError(f"Length of metrics_list and router_types must match. Found lengths: {len(metrics_list)} and {len(router_types)}.")
+
     os.makedirs(output_dir, exist_ok=True)
     filepath = os.path.join(output_dir, f"{filename}.csv")
     with open(filepath, "w", newline="") as f:
         writer = csv.writer(f)
 
         # Write header
-        writer.writerow(
-            ["Router", "Throughput", "Average Delay", "Packet Loss Rate"]
-        )
+        writer.writerow(["Router", "Throughput", "Average Delay", "Packet Loss Rate"])
 
         # Write data
         for i, metrics in enumerate(metrics_list):
             writer.writerow(
                 [
                     router_types[i],
-                    metrics["throughput"],
-                    metrics["average_delay"],
-                    metrics["packet_loss_rate"],
+                    metrics.get("throughput", 0),
+                    metrics.get("average_delay", 0),
+                    metrics.get("packet_loss_rate", 0),
                 ]
             )
 
 
 def compare_routers(
-    simulators: List[NetworkSimulator],
-    output_dir: str
+    simulators: List[NetworkSimulator], output_dir: str
 ) -> Dict[str, List[float]]:
     """Compare metrics from different routers.
 
@@ -94,6 +98,9 @@ def compare_routers(
     Returns:
         Dictionary of metric comparisons.
     """
+    if not simulators:
+        raise ValueError("Simulators list is empty.")
+
     metrics_list = [sim.metrics for sim in simulators]
     router_types = [sim.router_type for sim in simulators]
 
@@ -105,9 +112,9 @@ def compare_routers(
     # Create comparison dictionary
     comparison = {
         "router_types": router_types,
-        "throughput": [m["throughput"] for m in metrics_list],
-        "average_delay": [m["average_delay"] for m in metrics_list],
-        "packet_loss_rate": [m["packet_loss_rate"] for m in metrics_list],
+        "throughput": [m.get("throughput", 0) for m in metrics_list],
+        "average_delay": [m.get("average_delay", 0) for m in metrics_list],
+        "packet_loss_rate": [m.get("packet_loss_rate", 0) for m in metrics_list],
     }
 
     return comparison

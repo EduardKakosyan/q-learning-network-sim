@@ -1,11 +1,12 @@
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from typing import List, Optional, Tuple
-from network_sim.core.packet import Packet
-import random
-import numpy as np
-
 from typing import TYPE_CHECKING
+import numpy as np
+import random
+
+from network_sim.core.packet import Packet
+
 if TYPE_CHECKING:
     from node import Node
     from simulator import NetworkSimulator
@@ -14,23 +15,24 @@ if TYPE_CHECKING:
 class Router(ABC):
     """Abstract base class for packet scheduling algorithms"""
 
-    def __init__(self, node: 'Node'):
-        """
-        Initialize the scheduling algorithm
+    def __init__(self, node: "Node") -> None:
+        """Initialize the scheduling algorithm
+
+        Args:
+            node: The node associated with this router.
         """
         self.name = "Base Router"
         self.node = node
 
     @abstractmethod
     def route_packet(self, packet: Packet) -> int:
-        """
-        Select the next packet to transmit from the queue
+        """Select the next packet to transmit from the queue
 
         Args:
-            queue: Link object where the packet will be transmitted
+            packet: The packet to be routed.
 
         Returns:
-            Selected packet or None if no packet should be transmitted
+            The next hop node ID.
         """
         pass
 
@@ -39,35 +41,40 @@ class Router(ABC):
 
 
 class DijkstraRouter(Router):
-    """First-In-First-Out (FIFO) scheduling algorithm"""
+    """Dijkstra-based routing algorithm"""
 
-    def __init__(self, node: 'Node'):
+    def __init__(self, node: "Node") -> None:
         super().__init__(node)
         self.name = "Dijk"
 
-    def route_packet(self, packet):
-        """Select the next packet using FIFO policy"""
+    def route_packet(self, packet: Packet) -> int:
+        """Select the next packet using Dijkstra's algorithm"""
         if not self.node.queue:
-            raise ValueError("Who schedules packets with an empty buffer?")
+            raise ValueError("Cannot schedule packets with an empty buffer.")
         next_hop = self.node.routing_table[packet.destination]
         return next_hop
 
 
 class LeastCongestionFirstRouter(Router):
-    """Round Robin (RR) scheduling algorithm"""
+    """Least Congestion First (LCF) routing algorithm"""
 
-    def __init__(self, node: 'Node'):
+    def __init__(self, node: "Node") -> None:
         super().__init__(node)
         self.name = "LCF"
 
-    def route_packet(self, packet):
+    def route_packet(self, packet: Packet) -> int:
+        """Select the next packet using LCF policy"""
         smallest_buffer_usage = min(
             [neighbour.buffer_usage() for _, neighbour in self.node.neighbours.items()]
         )
 
-        min_ids = [id for id, neighbour in self.node.neighbours.items() if smallest_buffer_usage == neighbour.buffer_usage()]
+        min_ids = [
+            id
+            for id, neighbour in self.node.neighbours.items()
+            if smallest_buffer_usage == neighbour.buffer_usage()
+        ]
         if not min_ids:
-            raise ValueError("Who turned off the wifi?")
+            raise ValueError("No available neighbours to route the packet. Check network connectivity and routing table.")
 
         action = random.choice(min_ids)
 
@@ -79,20 +86,23 @@ class QRouter(Router):
 
     def __init__(
         self,
-        node: 'Node',
-        simulator: 'NetworkSimulator',
-        learning_rate=0.1,
-        discount_factor=0.9,
-        exploration_rate=0.1,
-        bins=4,
-        bin_base=10
-    ):
+        node: "Node",
+        simulator: "NetworkSimulator",
+        learning_rate: float = 0.1,
+        discount_factor: float = 0.9,
+        exploration_rate: float = 0.1,
+        bins: int = 4,
+        bin_base: int = 10,
+    ) -> None:
         super().__init__(node)
         self.name = "Q-Router"
         self.learning_rate = learning_rate
         self.discount_factor = discount_factor
         self.exploration_rate = exploration_rate
-        self.bins = [(float(x) - 1) / (bin_base - 1) for x in np.logspace(0, 1, bins + 1, base=bin_base)][1:]
+        self.bins = [
+            (float(x) - 1) / (bin_base - 1)
+            for x in np.logspace(0, 1, bins + 1, base=bin_base)
+        ][1:]
         self.q_table = defaultdict(lambda: defaultdict(float))
 
         # State-action pair tracking for packets w timestamps
@@ -100,12 +110,10 @@ class QRouter(Router):
         self.packet_history = {}
 
         # Register hooks for packet events
-        # simulator.register_hook('packet_hop', self.on_packet_hop)
-        simulator.register_hook('packet_arrived', self.on_packet_arrived)
-        simulator.register_hook('packet_dropped', self.on_packet_dropped)
-        # simulator.register_hook('sim_end', self.on_sim_end)
+        simulator.register_hook("packet_arrived", self.on_packet_arrived)
+        simulator.register_hook("packet_dropped", self.on_packet_dropped)
 
-    def _usage_to_bin(self, usage: float)->int:
+    def _usage_to_bin(self, usage: float) -> int:
         for i, divider in enumerate(self.bins):
             if usage <= divider:
                 return i
@@ -127,16 +135,16 @@ class QRouter(Router):
         """Get available actions in the current state"""
         return list(self.node.links.keys())
 
-    def route_packet(self, packet):
+    def route_packet(self, packet: Packet) -> int:
         """Select the next packet using Q-learning policy"""
         if not self.node.queue:
-            raise ValueError("Who schedules a packet with an empty buffer?")
+            raise ValueError("Cannot schedule a packet with an empty buffer.")
 
         state = self._get_state(packet)
         actions = self._get_actions()
 
         if not actions:
-            raise ValueError("Who makes a router with no links?")
+            raise ValueError("Router has no available links. Check the router's configuration and connectivity.")
 
         if random.random() < self.exploration_rate:
             # exploration
@@ -156,7 +164,9 @@ class QRouter(Router):
 
         return action
 
-    def on_packet_hop(self, packet: Packet, from_node, to_node, time):
+    def on_packet_hop(
+        self, packet: Packet, from_node: "Node", to_node: "Node", time: float
+    ) -> None:
         """Callback for packet_hop"""
         if packet.id in self.packet_history:
             prev_state, prev_action, prev_time = self.packet_history[packet.id]
@@ -166,7 +176,7 @@ class QRouter(Router):
             self.update_q_table(prev_state, prev_action, reward)
             self.packet_history[packet.id] = (None, None, time)
 
-    def on_packet_arrived(self, packet: Packet, node, time):
+    def on_packet_arrived(self, packet: Packet, node: "Node", time: float) -> None:
         """Callback for packet_arrived"""
         if packet.id in self.packet_history:
             prev_state, prev_action, prev_time = self.packet_history[packet.id]
@@ -176,7 +186,9 @@ class QRouter(Router):
             self.update_q_table(prev_state, prev_action, reward, is_terminal=True)
             del self.packet_history[packet.id]
 
-    def on_packet_dropped(self, packet: Packet, node, reason, time):
+    def on_packet_dropped(
+        self, packet: Packet, node: "Node", reason: str, time: float
+    ) -> None:
         """Callback for packet_dropped"""
         if packet.id in self.packet_history:
             prev_state, prev_action, prev_time = self.packet_history[packet.id]
@@ -186,17 +198,21 @@ class QRouter(Router):
             self.update_q_table(prev_state, prev_action, reward, is_terminal=True)
             del self.packet_history[packet.id]
 
-    def on_sim_end(self, metrics):
+    def on_sim_end(self, metrics: dict) -> None:
         from pprint import pprint
+
         def convert_to_dict(d):
             if isinstance(d, defaultdict):
                 d = dict({k: convert_to_dict(v) for k, v in d.items()})
             return d
+
         print(f"Node {self.node.id} q table:")
         pprint(convert_to_dict(self.q_table))
 
-    def _calculate_hop_reward(self, packet: Packet, to_node, time_diff):
-        """Calc reward for successful hop"""
+    def _calculate_hop_reward(
+        self, packet: Packet, to_node: "Node", time_diff: float
+    ) -> float:
+        """Calculate reward for successful hop"""
         # small neg to encourage short paths
         reward = -1.0
 
@@ -210,7 +226,7 @@ class QRouter(Router):
         # could add more complex rewards [congestion?]
         return reward
 
-    def _calculate_success_reward(self, packet: Packet):
+    def _calculate_success_reward(self, packet: Packet) -> float:
         """Calculate reward for successful packet delivery"""
         # big pos reward for arrival
         reward = 20.0
@@ -229,7 +245,7 @@ class QRouter(Router):
 
         return reward
 
-    def _calculate_drop_reward(self, reason: str):
+    def _calculate_drop_reward(self, reason: str) -> float:
         """Calculate penalty for dropping a packet"""
         # big neg for dropping
         reward = -20.0
@@ -244,7 +260,14 @@ class QRouter(Router):
 
         return reward
 
-    def update_q_table(self, state, action: int, reward: float, next_state=None, is_terminal=False):
+    def update_q_table(
+        self,
+        state: Tuple[int, int, Tuple[int, ...]],
+        action: int,
+        reward: float,
+        next_state: Optional[Tuple[int, int, Tuple[int, ...]]] = None,
+        is_terminal: bool = False,
+    ) -> None:
         """Update Q-table using the Q-learning update rule
 
         Args:
@@ -270,21 +293,25 @@ class QRouter(Router):
                 max_next_q = 0
 
         current_q = self.q_table[state][action]
-        new_q = current_q + self.learning_rate * (reward + self.discount_factor * max_next_q - current_q)
+        new_q = current_q + self.learning_rate * (
+            reward + self.discount_factor * max_next_q - current_q
+        )
         self.q_table[state][action] = new_q
+
 
 def router_factory(
     router_type: str,
-    node: 'Node',
-    simulator: Optional['NetworkSimulator'] = None,
-    **kwargs
+    node: "Node",
+    simulator: Optional["NetworkSimulator"] = None,
+    **kwargs,
 ) -> Router:
     """
     Factory function to create the appropriate router
 
     Args:
         router_type: Type of the router ("RR", "QL", or other for FIFO)
-        env: SimPy environment
+        node: The node to which the router is attached.
+        simulator: The network simulator instance.
 
     Returns:
         An instance of the selected scheduling algorithm
@@ -293,7 +320,7 @@ def router_factory(
         return LeastCongestionFirstRouter(node)
     elif router_type == "QL":
         if simulator is None:
-            raise ValueError("Who forgot a simulator for the q router")
+            raise ValueError("Simulator is required for QRouter.")
         return QRouter(node, simulator, **kwargs)
     else:
         # Default to FIFO

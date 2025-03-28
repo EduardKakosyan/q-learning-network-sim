@@ -1,44 +1,59 @@
+#!/usr/bin/env python3
+"""Demo script to compare different routing algorithms in a simulated network."""
+
 import argparse
 from collections import Counter
 from pprint import pprint
 import random
 import matplotlib.pyplot as plt
-
+from typing import Dict, List
 from example import simulator_creator
 from network_sim.core.simulator import NetworkSimulator
 from network_sim.utils.metrics import calculate_fairness_index
-from network_sim.utils.visualization import plot_buffer_usages, plot_link_utilizations, plot_metrics, plot_packet_journeys
+from network_sim.utils.visualization import (
+    plot_buffer_usages,
+    plot_link_utilizations,
+    plot_metrics,
+    plot_packet_journeys,
+)
 
 
-def main():
-    parser = argparse.ArgumentParser(description="Run the specific simulations for the demo to compare results.")
-    parser.add_argument("--last", action="store_true", help="Skip every iteration except the last item from both for loops")
+def main() -> None:
+    """Run the specific simulations for the demo to compare results."""
+    parser = argparse.ArgumentParser(
+        description="Run the specific simulations for the demo to compare results."
+    )
+    parser.add_argument(
+        "--last",
+        action="store_true",
+        help="Skip every iteration except the last item from both for loops",
+    )
     args = parser.parse_args()
 
     # Topology parameters
-    num_nodes = 8
-    num_generators = 4
+    num_nodes: int = 8
+    num_generators: int = 4
 
     # Simulation parameters
-    routers = ["Dijkstra", "LCF", "QL"]
-    router_time_scale = 0.0
-    duration = 10.0
+    routers: List[str] = ["Dijkstra", "LCF", "QL"]
+    router_time_scale: float = 0.0
+    duration: float = 10.0
 
     # The best Q Learning parameters:
-    ql_params = {
+    ql_params: Dict[str, float] = {
         "learning_rate": 0.5,
         "discount_factor": 0.99,
         "exploration_rate": 0.1,
         "bins": 4,
-        "bin_base": 10
+        "bin_base": 10,
     }
-    
-    seed = random.randint(0, 2**32 - 1)
+
+    seed: int = random.randint(0, 2**32 - 1)
     print("Seed:", seed)
     # seed = 3225047426 # Decent
     # seed = 2845411063 # Amazing
 
-    excess_edges_list = [4, 15]
+    excess_edges_list: List[int] = [4, 15]
 
     if args.last:
         excess_edges_list = [excess_edges_list[-1]]
@@ -52,7 +67,7 @@ def main():
             router_time_scale,
             ql_params,
             seed=seed,
-            block=False
+            block=False,
         )
         graph_fig_manager = plt.get_current_fig_manager()
         input("Press enter to continue")
@@ -64,27 +79,32 @@ def main():
             packet_scale_list = [3]
 
         for packet_scale in packet_scale_list:
-            simulator_list = []
-            metrics_list = []
+            simulator_list: List[NetworkSimulator] = []
+            metrics_list: List[dict] = []
             print(f"\nRunning simulations with packet_scale={packet_scale}")
             for router in routers:
                 print(f"\nRunning simulation with {router} router...")
                 simulator: NetworkSimulator = simulator_func(router, packet_scale)
                 simulator.run(duration, updates=True)
-                
+
                 simulator_list.append(simulator)
                 metrics_list.append(simulator.metrics)
 
-                delay = simulator.metrics["average_delay"]
-                packet_loss = simulator.metrics["packet_loss_rate"]
-                throughput = simulator.metrics["throughput"]
-                fairness = calculate_fairness_index(simulator)
+                delay: float = simulator.metrics["average_delay"]
+                packet_loss: float = simulator.metrics["packet_loss_rate"]
+                throughput: float = simulator.metrics["throughput"]
+                fairness: float = calculate_fairness_index(simulator)
                 print(f"  Average Delay:  {delay:.2f} s")
                 print(f"  Packet loss:    {packet_loss * 100:.2f}%")
                 print(f"  Throughput:     {int(throughput)} packets")
                 print(f"  Fairness index: {fairness:.4f}")
                 if simulator.dropped_packets:
-                    counter = Counter([f"{packet.current_node}: {reason}" for packet, reason in simulator.dropped_packets])
+                    counter = Counter(
+                        [
+                            f"{packet.current_node}: {reason}"
+                            for packet, reason in simulator.dropped_packets
+                        ]
+                    )
                     print("  Number of packets:", len(simulator.packets))
                     pprint(dict({k: v for k, v in counter.items()}))
 
@@ -97,8 +117,15 @@ def main():
             plot_metrics(metrics_list, show=False)
             fig_manager_4 = plt.get_current_fig_manager()
             # Arrange the figures in a 2x2 grid
-            fig_manager_list = [fig_manager_1, fig_manager_2, fig_manager_3, fig_manager_4]
-            screen_width, screen_height = fig_manager_list[0].canvas.manager.window.wm_maxsize()
+            fig_manager_list = [
+                fig_manager_1,
+                fig_manager_2,
+                fig_manager_3,
+                fig_manager_4,
+            ]
+            screen_width, screen_height = fig_manager_list[
+                0
+            ].canvas.manager.window.wm_maxsize()
             fig_width, fig_height = screen_width // 2, screen_height // 2
 
             for i, fig_manager in enumerate(fig_manager_list):
