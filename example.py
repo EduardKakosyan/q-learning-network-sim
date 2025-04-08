@@ -192,7 +192,7 @@ def main() -> None:
     num_generators: int = 5
 
     # Simulation parameters
-    routers: List[str] = ["Dijkstra", "LCF", "QL"]
+    routers: List[str] = ["Dijkstra", "OSPF", "QL"]
     router_time_scale: float = 0.0
     duration: float = 10.0
 

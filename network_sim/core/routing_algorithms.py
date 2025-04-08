@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from collections import defaultdict
-from typing import List, Optional, Tuple
-from typing import TYPE_CHECKING
+from typing import Dict, List, Optional, Tuple, TYPE_CHECKING
+import heapq
 import numpy as np
 import random
 
@@ -55,30 +55,66 @@ class DijkstraRouter(Router):
         return next_hop
 
 
-class LeastCongestionFirstRouter(Router):
-    """Least Congestion First (LCF) routing algorithm"""
+class OSPFRouter(Router):
+    """OSPF-based routing algorithm using link-state information and Dijkstra's algorithm."""
 
-    def __init__(self, node: "Node") -> None:
+    def __init__(self, node: "Node", simulator: "NetworkSimulator") -> None:
         super().__init__(node)
-        self.name = "LCF"
+        self.name = "OSPF"
+        self.simulator = simulator
+        simulator.register_hook("update", self.update_routing_table)
+
+    def update_routing_table(self, sim_time: float = None) -> None:
+        """
+        Update the routing table using Dijkstra's algorithm based on the complete network topology.
+            
+        :param network_graph: A dictionary representing the network topology,
+                            mapping node ids to their neighbours and associated link costs.
+                            Example: {node_id: {neighbour_id: cost, ...}, ...}
+        """
+        source = self.node.id
+        # Priority queue holds tuples of (accumulated_cost, current_node, first_hop)
+        # For the source, first_hop is None.
+        queue = [(0, source, None)]
+        # distances store the best known cost and first hop to reach each node: {node: (cost, first_hop)}
+        distances: Dict[int, Tuple[int, int]] = {source: (0, None)}
+
+        while queue:
+            cost, current, first_hop = heapq.heappop(queue)
+            current_node = self.simulator.nodes[current]
+            # Traverse all neighbours of the current node based on the network graph.
+            for id, neighbour in current_node.neighbours.items():
+                total_bandwidth = 0
+                for _, link in neighbour.links.items():
+                    total_bandwidth += link.capacity / 8  # Convert to bytes
+                # Calculate the cost of the link to the neighbour node.
+                link_cost = current_node.links[id].propagation_delay + neighbour.buffer_used / total_bandwidth
+                new_cost = cost + link_cost
+                # If we're at the source, the neighbour is the first hop. Otherwise, inherit the first hop.
+                nh = id if current == source else first_hop
+                if id not in distances or new_cost < distances[id][0]:
+                    distances[id] = (new_cost, nh)
+                    heapq.heappush(queue, (new_cost, id, nh))
+
+        self.routing_table = distances
 
     def route_packet(self, packet: Packet) -> int:
-        """Select the next packet using LCF policy"""
-        smallest_buffer_usage = min(
-            [neighbour.buffer_usage() for _, neighbour in self.node.neighbours.items()]
-        )
+        """
+        Select the next hop for the given packet based on the current routing table.
 
-        min_ids = [
-            id
-            for id, neighbour in self.node.neighbours.items()
-            if smallest_buffer_usage == neighbour.buffer_usage()
-        ]
-        if not min_ids:
-            raise ValueError("No available neighbours to route the packet. Check network connectivity and routing table.")
-
-        action = random.choice(min_ids)
-
-        return action
+        :param packet: The packet to be routed.
+        :return: The next hop node id.
+        :raises ValueError: If there are no packets in the buffer or if no route exists.
+        """
+        if not self.node.queue:
+            raise ValueError("Cannot schedule packets with an empty buffer.")
+        dest = packet.destination
+        if dest not in self.routing_table:
+            raise ValueError(f"No route found for destination {dest}.")
+        next_hop = self.routing_table[dest][1]
+        if next_hop is None:
+            raise ValueError("Packet is already at the destination or no valid next hop found.")
+        return next_hop
 
 
 class QRouter(Router):
@@ -316,12 +352,14 @@ def router_factory(
     Returns:
         An instance of the selected scheduling algorithm
     """
-    if router_type == "LCF":
-        return LeastCongestionFirstRouter(node)
-    elif router_type == "QL":
+    if router_type == "QL":
         if simulator is None:
             raise ValueError("Simulator is required for QRouter.")
         return QRouter(node, simulator, **kwargs)
+    elif router_type == "OSPF":
+        if simulator is None:
+            raise ValueError("Simulator is required for OSPFRouter.")
+        return OSPFRouter(node, simulator)
     else:
         # Default to FIFO
         return DijkstraRouter(node)

@@ -35,7 +35,7 @@ def main() -> None:
     num_generators: int = 4
 
     # Simulation parameters
-    routers: List[str] = ["Dijkstra", "LCF", "QL"]
+    routers: List[str] = ["Dijkstra", "OSPF", "QL"]
     router_time_scale: float = 0.0
     duration: float = 10.0
 
@@ -52,6 +52,7 @@ def main() -> None:
     print("Seed:", seed)
     # seed = 3225047426 # Decent
     # seed = 2845411063 # Amazing
+    # seed = 2798147635 # Also Amazing
 
     excess_edges_list: List[int] = [4, 15]
 
