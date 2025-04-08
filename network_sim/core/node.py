@@ -7,7 +7,7 @@ This module defines the Node class, which represents a network node
 from collections import deque
 import time
 import simpy
-from typing import Callable, Deque, Dict, Tuple
+from typing import Any, Callable, Deque, Dict, Generator, List, Tuple
 
 from network_sim.core.link import Link
 from network_sim.core.packet import Packet
@@ -35,20 +35,21 @@ class Node:
         router_func: Callable[[], Router],
         buffer_size: float = float("inf"),
         time_scale: float = 1.0,
-    ):
+    ) -> None:
         """Initialize a network node.
 
         Args:
             env: SimPy environment.
             node_id: Unique identifier for the node.
-            router: Scheduling algorithm for packet processing.
+            router_func: Function to create a router for packet processing.
             buffer_size: Maximum buffer size in bytes (default: infinite).
+            time_scale: Time scale for scheduling operations.
         """
         self.env = env
         self.id = node_id
         self.router: Router = router_func(self)
         if self.router is None:
-            raise ValueError("router_func did not return a router")
+            raise ValueError("router_func did not return a router.")
         self.buffer_used = 0
         self.buffer_size = buffer_size
         self.time_scale = time_scale
@@ -59,15 +60,24 @@ class Node:
         self.queue: Deque[Packet] = deque()
         self.resource = simpy.Resource(env, capacity=1)
         self.neighbours: Dict[int, Node] = {}
+        self.buffer_usage_history: List[Tuple[float, float]] = []
 
-    def add_link(self, link: Link, node) -> None:
+        def update() -> Generator[Any, Any, Any]:
+            while True:
+                yield self.env.timeout(0.1)
+                self.buffer_usage_history.append((self.env.now, self.buffer_usage()))
+
+        self.env.process(update())
+
+    def add_link(self, link: Link, node: "Node") -> None:
         """Add an outgoing link from this node.
 
         Args:
             link: The link to add.
+            node: The destination node for the link.
         """
         if link.source != self.id or link.destination == self.id:
-            raise ValueError("Who assigns a link to a node that isn't connected to the node?")
+            raise ValueError("Link source or destination is incorrect for this node. Verify the link's configuration.")
         self.links[link.destination] = link
         self.neighbours[link.destination] = node
 
@@ -95,7 +105,6 @@ class Node:
 
         Args:
             packet: The packet to add.
-            router: Router object.
         """
         self.queue.append(packet)
         self.buffer_used += packet.size
@@ -110,28 +119,35 @@ class Node:
             return self.buffer_used
         return self.buffer_used / self.buffer_size
 
-    def packet_arrived(self, packet: Packet):
+    def packet_arrived(self, packet: Packet) -> None:
+        """Handle packet arrival at the node.
+
+        Args:
+            packet: The packet that has arrived.
+        """
         self.packets_arrived += 1
         self.buffer_used -= packet.size
 
-    def packet_dropped(self, packet: Packet):
+    def packet_dropped(self, packet: Packet) -> None:
+        """Handle packet drop at the node.
+
+        Args:
+            packet: The packet that was dropped.
+        """
         self.packets_dropped += 1
-        self.buffer_used -= packet.size
 
     def route_packet(self, packet: Packet) -> Tuple[int, float]:
         """Get the next packet to transmit based on router type.
 
         Args:
-            router: Router object.
+            packet: The packet to be routed.
 
         Returns:
-            The next packet to transmit or None if no packets are available, and
-            the scheduling delay.
+            The next hop node ID and the scheduling delay.
         """
         start_time = time.perf_counter()
-        hop = self.router.route_packet(packet)
-        end_time = time.perf_counter()
-        scheduling_delay = (end_time - start_time) * self.time_scale
+        hop, extra_time = self.router.route_packet(packet)
+        scheduling_delay = (time.perf_counter() - start_time + extra_time) * self.time_scale
 
         self.queue.remove(packet)
         self.buffer_used -= packet.size

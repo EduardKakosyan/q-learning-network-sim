@@ -8,6 +8,7 @@ import simpy
 
 from network_sim.core.packet import Packet
 
+
 class Link:
     """Represents a network link between nodes.
 
@@ -27,8 +28,8 @@ class Link:
         source: int,
         destination: int,
         capacity: float,
-        propagation_delay: float
-    ):
+        propagation_delay: float,
+    ) -> None:
         """Initialize a network link.
 
         Args:

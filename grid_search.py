@@ -1,19 +1,19 @@
 from itertools import product
-
+from typing import Dict, List
 from example import run_simulation, simulator_creator
 from network_sim.utils.metrics import calculate_fairness_index
 
 # Topology parameters
-num_nodes = 8
-excess_edges = 18
-num_generators = 5
+num_nodes: int = 8
+excess_edges: int = 15
+num_generators: int = 4
 
 # Simulation parameters
-router_time_scale = 1.0
-duration = 10.0
+router_time_scale: float = 1.0
+duration: float = 10.0
 
 # Define the grid of hyperparameters
-param_grid = {
+param_grid: Dict[str, List[float]] = {
     "learning_rate": [0.01, 0.1, 0.2, 0.5],
     "discount_factor": [0.8, 0.9, 0.99],
     "exploration_rate": [0.01, 0.1, 0.2],
@@ -21,26 +21,45 @@ param_grid = {
     "bin_base": [10, 20, 30],
 }
 
-def grid_search_q_learning(param_grid, router_type="QL"):
-    best_params = None
-    best_score = float('-inf')
 
-    param_combos = product(*param_grid.values())
-    num_param_combos = len(param_combos)
+def grid_search_q_learning(
+    param_grid: Dict[str, List[float]], router_type: str = "QL"
+) -> Dict[str, float]:
+    """Perform a grid search to find the best Q-learning parameters.
+
+    Args:
+        param_grid: Dictionary of hyperparameters to search over.
+        router_type: Type of router to use in the simulation.
+
+    Returns:
+        The best set of Q-learning parameters found.
+    """
+    best_params: Dict[str, float] = None
+    best_score: float = float("-inf")
+
+    param_combos = list(product(*param_grid.values()))
+    num_param_combos: int = len(param_combos)
     for i, params in enumerate(param_combos):
-        ql_params = dict(zip(param_grid.keys(), params))
+        ql_params: Dict[str, float] = dict(zip(param_grid.keys(), params))
         print(f"Testing Q-learning parameters: {ql_params}")
-        print(f"Percent done: {i / num_param_combos * 100}%")
+        print(f"Percent done: {i / num_param_combos * 100:.2f}%")
 
-        simulator_func = simulator_creator(num_nodes, excess_edges, num_generators, router_time_scale, ql_params)
+        simulator_func = simulator_creator(
+            num_nodes,
+            excess_edges,
+            num_generators,
+            router_time_scale,
+            ql_params,
+            show=False,
+        )
         simulator = run_simulation(simulator_func, router_type, duration)
 
-        performance = simulator.metrics["average_delay"]
-        packet_loss = simulator.metrics["packet_loss_rate"]
-        fairness = calculate_fairness_index(simulator)
+        performance: float = simulator.metrics["average_delay"]
+        packet_loss: float = simulator.metrics["packet_loss_rate"]
+        fairness: float = calculate_fairness_index(simulator)
 
         # Calculate a combined score
-        score = -performance - packet_loss + fairness
+        score: float = -performance - packet_loss + fairness
 
         if score > best_score:
             best_score = score
@@ -49,5 +68,6 @@ def grid_search_q_learning(param_grid, router_type="QL"):
     print(f"Best Q-learning parameters: {best_params} with score: {best_score}")
     return best_params
 
+
 # Run the grid search
-best_ql_params = grid_search_q_learning(param_grid)
+best_ql_params: Dict[str, float] = grid_search_q_learning(param_grid)

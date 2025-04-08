@@ -13,15 +13,19 @@ from network_sim.core.simulator import NetworkSimulator
 
 
 def save_metrics_to_json(
-    metrics: Dict[str, Any], filename: str = "results/metrics.json"
+    metrics: Dict[str, Any],
+    output_dir: str,
+    filename: str,
 ) -> None:
     """Save metrics to a JSON file.
 
     Args:
         metrics: Dictionary of metrics to save.
-        filename: Output filename.
+        output_dir: Output directory.
+        filename: The name for the file.
     """
-    os.makedirs(os.path.dirname(filename), exist_ok=True)
+    if not metrics:
+        raise ValueError("Metrics dictionary is empty. Provide a non-empty dictionary of metrics.")
 
     # Convert non-serializable types
     serializable_metrics = {}
@@ -37,6 +41,8 @@ def save_metrics_to_json(
         else:
             serializable_metrics[key] = value
 
+    os.makedirs(output_dir, exist_ok=True)
+    filename = os.path.join(output_dir, f"{filename}.json")
     with open(filename, "w") as f:
         json.dump(serializable_metrics, f, indent=2)
 
@@ -44,39 +50,44 @@ def save_metrics_to_json(
 def save_metrics_to_csv(
     metrics_list: List[Dict[str, Any]],
     router_types: List[str],
-    filename: str = "results/metrics_comparison.csv",
+    output_dir: str,
+    filename: str,
 ) -> None:
     """Save comparison of metrics from different routers to a CSV file.
 
     Args:
         metrics_list: List of metrics dictionaries from different simulations.
         router_types: List of router types corresponding to metrics_list.
-        filename: Output filename.
+        output_dir: Output directory.
+        filename: The filename for the file.
     """
-    os.makedirs(os.path.dirname(filename), exist_ok=True)
+    if not metrics_list or not router_types:
+        raise ValueError("Metrics list or router types are empty.")
+    if len(metrics_list) != len(router_types):
+        raise ValueError(f"Length of metrics_list and router_types must match. Found lengths: {len(metrics_list)} and {len(router_types)}.")
 
-    with open(filename, "w", newline="") as f:
+    os.makedirs(output_dir, exist_ok=True)
+    filepath = os.path.join(output_dir, f"{filename}.csv")
+    with open(filepath, "w", newline="") as f:
         writer = csv.writer(f)
 
         # Write header
-        writer.writerow(
-            ["Router", "Throughput", "Average Delay", "Packet Loss Rate"]
-        )
+        writer.writerow(["Router", "Throughput", "Average Delay", "Packet Loss Rate"])
 
         # Write data
         for i, metrics in enumerate(metrics_list):
             writer.writerow(
                 [
                     router_types[i],
-                    metrics["throughput"],
-                    metrics["average_delay"],
-                    metrics["packet_loss_rate"],
+                    metrics.get("throughput", 0),
+                    metrics.get("average_delay", 0),
+                    metrics.get("packet_loss_rate", 0),
                 ]
             )
 
 
 def compare_routers(
-    simulators: List[NetworkSimulator], output_dir: str = "results"
+    simulators: List[NetworkSimulator], output_dir: str
 ) -> Dict[str, List[float]]:
     """Compare metrics from different routers.
 
@@ -87,20 +98,23 @@ def compare_routers(
     Returns:
         Dictionary of metric comparisons.
     """
+    if not simulators:
+        raise ValueError("Simulators list is empty.")
+
     metrics_list = [sim.metrics for sim in simulators]
     router_types = [sim.router_type for sim in simulators]
 
     # Save metrics to files
     save_metrics_to_csv(
-        metrics_list, router_types, f"{output_dir}/metrics_comparison.csv"
+        metrics_list, router_types, output_dir, "metrics_comparison.csv"
     )
 
     # Create comparison dictionary
     comparison = {
         "router_types": router_types,
-        "throughput": [m["throughput"] for m in metrics_list],
-        "average_delay": [m["average_delay"] for m in metrics_list],
-        "packet_loss_rate": [m["packet_loss_rate"] for m in metrics_list],
+        "throughput": [m.get("throughput", 0) for m in metrics_list],
+        "average_delay": [m.get("average_delay", 0) for m in metrics_list],
+        "packet_loss_rate": [m.get("packet_loss_rate", 0) for m in metrics_list],
     }
 
     return comparison
