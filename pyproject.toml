@@ -1,6 +1,6 @@
 [project]
 name = "q-learning-network-sim"
-version = "0.1.0"
+version = "1.0.0"
 description = "A comparative study of reinforcement learning-based routing (Q-routing) against traditional routing algorithms"
 authors = [
     { name = "Ethan Rozee" },
