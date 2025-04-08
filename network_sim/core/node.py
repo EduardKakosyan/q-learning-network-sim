@@ -4,10 +4,11 @@ This module defines the Node class, which represents a network node
 (router, switch, host) in the simulated network.
 """
 
+from collections.abc import Generator
 from collections import deque
 import time
 import simpy
-from typing import Any, Callable, Deque, Dict, Generator, List, Tuple
+from typing import Any, Callable, Deque, Dict, List, Tuple
 
 from network_sim.core.link import Link
 from network_sim.core.packet import Packet

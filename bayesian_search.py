@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 """Hyper-parameter search for Q-learning router using Optuna."""
 
-import random
-import optuna
-from typing import Dict, List
 from example import simulator_creator
+import optuna
+import random
 
 seed: int = random.randint(0, 2**32 - 1)
 
@@ -28,7 +27,7 @@ def objective(trial: optuna.Trial) -> tuple[float, float, float]:
     duration: float = 10.0
 
     # Q Learning parameters
-    param_grid: Dict[str, List[float]] = {
+    param_grid: dict[str, list[float]] = {
         "learning_rate": [0.01, 0.1, 0.2, 0.5],
         "discount_factor": [0.8, 0.9, 0.99],
         "exploration_rate": [0.01, 0.1, 0.2, 0.5],
@@ -39,7 +38,7 @@ def objective(trial: optuna.Trial) -> tuple[float, float, float]:
     def get(name: str) -> float:
         return trial.suggest_categorical(name, param_grid[name])
 
-    ql_params: Dict[str, float] = {
+    ql_params: dict[str, float] = {
         "learning_rate": get("learning_rate"),
         "discount_factor": get("discount_factor"),
         "exploration_rate": get("exploration_rate"),
