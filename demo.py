@@ -5,6 +5,7 @@ import argparse
 from collections import Counter
 from pprint import pprint
 import random
+import time
 import matplotlib.pyplot as plt
 from typing import Dict, List
 from example import simulator_creator
@@ -36,7 +37,7 @@ def main() -> None:
 
     # Simulation parameters
     routers: List[str] = ["Dijkstra", "OSPF", "QL"]
-    router_time_scale: float = 0.0
+    router_time_scale: float = 100.0
     duration: float = 10.0
 
     # The best Q Learning parameters:
@@ -52,6 +53,16 @@ def main() -> None:
     print("Seed:", seed)
 
     excess_edges_list: List[int] = [4, 15]
+
+    # Calculate the time scale for this computer.
+    start_time = time.perf_counter()
+    sum = 0
+    for i in range(10000000):
+        sum += i
+    test_time = time.perf_counter() - start_time
+    reference_test_time = 0.3002118999526526
+    relative_speedup = reference_test_time / test_time
+    router_time_scale *= relative_speedup
 
     if args.last:
         excess_edges_list = [excess_edges_list[-1]]
@@ -96,6 +107,7 @@ def main() -> None:
                 print(f"  Packet loss:    {packet_loss * 100:.2f}%")
                 print(f"  Throughput:     {int(throughput)} packets")
                 print(f"  Fairness index: {fairness:.4f}")
+                print(f"  Average Routing Delays: {simulator.metrics['average_routing_delays']}")
                 if simulator.dropped_packets:
                     counter = Counter(
                         [

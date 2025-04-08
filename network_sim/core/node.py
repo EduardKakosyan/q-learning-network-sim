@@ -147,9 +147,8 @@ class Node:
             The next hop node ID and the scheduling delay.
         """
         start_time = time.perf_counter()
-        hop = self.router.route_packet(packet)
-        end_time = time.perf_counter()
-        scheduling_delay = (end_time - start_time) * self.time_scale
+        hop, extra_time = self.router.route_packet(packet)
+        scheduling_delay = (time.perf_counter() - start_time + extra_time) * self.time_scale
 
         self.queue.remove(packet)
         self.buffer_used -= packet.size

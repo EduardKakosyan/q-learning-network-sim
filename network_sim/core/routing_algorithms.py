@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from collections import defaultdict
+import time
 from typing import Dict, List, Optional, Tuple, TYPE_CHECKING
 import heapq
 import numpy as np
@@ -24,9 +25,10 @@ class Router(ABC):
         """
         self.name = "Base Router"
         self.node = node
+        self.extra_delay = 0.0
 
     @abstractmethod
-    def route_packet(self, packet: Packet) -> int:
+    def route_packet(self, packet: Packet) -> Tuple[int, float]:
         """
         Determine the next hop for a packet.
 
@@ -34,7 +36,8 @@ class Router(ABC):
             packet: The packet to be routed.
 
         Returns:
-            The next hop node ID.
+            The next hop node ID and the extra time that was spent performing
+            other tasks.
         """
         pass
 
@@ -49,7 +52,7 @@ class DijkstraRouter(Router):
         super().__init__(node)
         self.name = "Dijk"
 
-    def route_packet(self, packet: Packet) -> int:
+    def route_packet(self, packet: Packet) -> Tuple[int, float]:
         """
         Route the packet using Dijkstra's algorithm.
 
@@ -62,7 +65,8 @@ class DijkstraRouter(Router):
         if not self.node.queue:
             raise ValueError("Cannot schedule packets with an empty buffer.")
         next_hop = self.node.routing_table[packet.destination]
-        return next_hop
+        extra_delay, self.extra_delay = self.extra_delay, 0.0
+        return next_hop, extra_delay
 
 
 class OSPFRouter(Router):
@@ -74,7 +78,7 @@ class OSPFRouter(Router):
         self.simulator = simulator
         simulator.register_hook("update", self.update_routing_table)
 
-    def update_routing_table(self, sim_time: float = None) -> None:
+    def update_routing_table(self, sim_sim_time: float = None) -> None:
         """
         Update the routing table using Dijkstra's algorithm based on the complete network topology.
             
@@ -82,6 +86,7 @@ class OSPFRouter(Router):
                             mapping node ids to their neighbours and associated link costs.
                             Example: {node_id: {neighbour_id: cost, ...}, ...}
         """
+        start_time = time.perf_counter()
         source = self.node.id
         # Priority queue holds tuples of (accumulated_cost, current_node, first_hop)
         # For the source, first_hop is None.
@@ -113,13 +118,15 @@ class OSPFRouter(Router):
                     heapq.heappush(queue, (new_cost, id, nh))
 
         self.routing_table = distances
+        
+        self.extra_delay += time.perf_counter() - start_time
 
-    def route_packet(self, packet: Packet) -> int:
+    def route_packet(self, packet: Packet) -> Tuple[int, float]:
         """
         Select the next hop for the given packet based on the current routing table.
 
         :param packet: The packet to be routed.
-        :return: The next hop node id.
+        :return: The next hop node id and the extra time incurred by the routing algorithm.
         :raises ValueError: If there are no packets in the buffer or if no route exists.
         """
         if not self.node.queue:
@@ -130,7 +137,8 @@ class OSPFRouter(Router):
         next_hop = self.routing_table[dest][1]
         if next_hop is None:
             raise ValueError("Packet is already at the destination or no valid next hop found.")
-        return next_hop
+        extra_delay, self.extra_delay = self.extra_delay, 0.0
+        return next_hop, extra_delay  # Return the extra delay incurred by the routing algorithm
 
 
 class QRouter(Router):
@@ -179,6 +187,11 @@ class QRouter(Router):
         # Register hooks for packet events
         simulator.register_hook("packet_arrived", self.on_packet_arrived)
         simulator.register_hook("packet_dropped", self.on_packet_dropped)
+        
+        # Initialize Q-table with entries from the routing table
+        # for destination, (cost, next_hop) in self.node.routing_table.items():
+        #     state = (self.node.id, destination, tuple([0] * len(self.node.neighbours)))
+        #     self.q_table[state][next_hop] = 1.0  # Assign a default positive Q-value
 
     def _usage_to_bin(self, usage: float) -> int:
         """
@@ -211,7 +224,7 @@ class QRouter(Router):
 
         bins = tuple(self._usage_to_bin(usage) for usage in buffer_usages)
 
-        state = (packet.source, packet.destination, bins)
+        state = (packet.destination, *bins)
         return state
 
     def _get_actions(self) -> List[int]:
@@ -223,7 +236,7 @@ class QRouter(Router):
         """
         return list(self.node.links.keys())
 
-    def route_packet(self, packet: Packet) -> int:
+    def route_packet(self, packet: Packet) -> Tuple[int, float]:
         """
         Route the packet using the Q-Learning policy.
 
@@ -231,7 +244,8 @@ class QRouter(Router):
             packet: The packet to be routed.
 
         Returns:
-            The next hop node ID.
+            The next hop node ID and the extra time that was spent performing
+            other tasks.
         """
         if not self.node.queue:
             raise ValueError("Cannot schedule a packet with an empty buffer.")
@@ -258,10 +272,11 @@ class QRouter(Router):
         current_time = self.node.env.now
         self.packet_history[packet.id] = (state, action, current_time)
 
-        return action
+        extra_delay, self.extra_delay = self.extra_delay, 0.0
+        return action, extra_delay
 
     def on_packet_hop(
-        self, packet: Packet, from_node: "Node", to_node: "Node", time: float
+        self, packet: Packet, from_node: "Node", to_node: "Node", sim_time: float
     ) -> None:
         """
         Callback for packet hop event.
@@ -270,8 +285,9 @@ class QRouter(Router):
             packet: The packet being routed.
             from_node: The node from which the packet is hopping.
             to_node: The node to which the packet is hopping.
-            time: The time of the hop event.
+            sim_time: The time of the hop event.
         """
+        start_time = time.perf_counter()
         if packet.id in self.packet_history:
             prev_state, prev_action, prev_time = self.packet_history[packet.id]
 
@@ -279,16 +295,19 @@ class QRouter(Router):
 
             self.update_q_table(prev_state, prev_action, reward)
             self.packet_history[packet.id] = (None, None, time)
+        self.extra_delay += time.perf_counter() - start_time
+        
 
-    def on_packet_arrived(self, packet: Packet, node: "Node", time: float) -> None:
+    def on_packet_arrived(self, packet: Packet, node: "Node", sim_time: float) -> None:
         """
         Callback for packet arrival event.
 
         Args:
             packet: The packet that arrived.
             node: The node where the packet arrived.
-            time: The time of the arrival event.
+            sim_time: The time of the arrival event.
         """
+        start_time = time.perf_counter()
         if packet.id in self.packet_history:
             prev_state, prev_action, prev_time = self.packet_history[packet.id]
 
@@ -296,9 +315,10 @@ class QRouter(Router):
 
             self.update_q_table(prev_state, prev_action, reward, is_terminal=True)
             del self.packet_history[packet.id]
+        self.extra_delay += time.perf_counter() - start_time
 
     def on_packet_dropped(
-        self, packet: Packet, node: "Node", reason: str, time: float
+        self, packet: Packet, node: "Node", reason: str, sim_time: float
     ) -> None:
         """
         Callback for packet drop event.
@@ -307,8 +327,9 @@ class QRouter(Router):
             packet: The packet that was dropped.
             node: The node where the packet was dropped.
             reason: The reason for dropping the packet.
-            time: The time of the drop event.
+            sim_time: The time of the drop event.
         """
+        start_time = time.perf_counter()
         if packet.id in self.packet_history:
             prev_state, prev_action, prev_time = self.packet_history[packet.id]
 
@@ -316,6 +337,7 @@ class QRouter(Router):
 
             self.update_q_table(prev_state, prev_action, reward, is_terminal=True)
             del self.packet_history[packet.id]
+        self.extra_delay += time.perf_counter() - start_time
 
     def on_sim_end(self, metrics: dict) -> None:
         """
