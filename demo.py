@@ -52,6 +52,8 @@ def main() -> None:
 
     seed: int = random.randint(0, 2**32 - 1)
     print("Seed:", seed)
+    # seed = 1991572796 # Good for 4 excess edges
+    # seed = 2928159604 # Not bad for 16 excess edges
 
     excess_edges_list: List[int] = [num_generators, num_generators ** 2]
 
