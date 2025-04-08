@@ -122,7 +122,7 @@ def simulator_creator(
         simulator = NetworkSimulator(env, router_type)
 
         def create_router(node: int) -> Any:
-            return router_factory(router_type, node, simulator=simulator, **ql_params)
+            return router_factory(router_type, node, simulator=simulator, seed=seed, **ql_params)
 
         for node in range(1, num_nodes + 1):
             simulator.add_node(
