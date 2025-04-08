@@ -110,6 +110,15 @@ class OSPFRouter(Router):
                 
                 link_cost = queue_time + transmission_time + propagation_delay
                 
+                if link_cost < 0:
+                    if queue_time < 0:
+                        raise ValueError("Queue time cannot be negative.")
+                    if transmission_time < 0:
+                        raise ValueError("Transmission time cannot be negative.")
+                    if propagation_delay < 0:
+                        raise ValueError("Propagation delay cannot be negative.")
+                    raise ValueError("Link cost cannot be negative. Not sure what the cause is.")
+                
                 # Compute the new accumulated cost to reach the neighbor
                 new_cost = cost + link_cost
                 # If we're at the source, the neighbour is the first hop. Otherwise, inherit the first hop.

@@ -24,6 +24,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description="Run the specific simulations for the demo to compare results."
     )
+    parser.add_argument("num_nodes", nargs="?", type=int, default=8, help="Number of nodes in the network")
     parser.add_argument(
         "--last",
         action="store_true",
@@ -32,8 +33,8 @@ def main() -> None:
     args = parser.parse_args()
 
     # Topology parameters
-    num_nodes: int = 8
-    num_generators: int = 4
+    num_nodes: int = args.num_nodes
+    num_generators: int = num_nodes // 2
 
     # Simulation parameters
     routers: List[str] = ["Dijkstra", "OSPF", "QL"]
@@ -52,7 +53,7 @@ def main() -> None:
     seed: int = random.randint(0, 2**32 - 1)
     print("Seed:", seed)
 
-    excess_edges_list: List[int] = [4, 15]
+    excess_edges_list: List[int] = [num_generators, num_generators ** 2]
 
     # Calculate the time scale for this computer.
     start_time = time.perf_counter()

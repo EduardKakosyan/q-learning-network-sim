@@ -135,7 +135,6 @@ class Node:
             packet: The packet that was dropped.
         """
         self.packets_dropped += 1
-        self.buffer_used -= packet.size
 
     def route_packet(self, packet: Packet) -> Tuple[int, float]:
         """Get the next packet to transmit based on router type.
