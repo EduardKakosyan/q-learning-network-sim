@@ -50,9 +50,6 @@ def main() -> None:
 
     seed: int = random.randint(0, 2**32 - 1)
     print("Seed:", seed)
-    # seed = 3225047426 # Decent
-    # seed = 2845411063 # Amazing
-    # seed = 2798147635 # Also Amazing
 
     excess_edges_list: List[int] = [4, 15]
 

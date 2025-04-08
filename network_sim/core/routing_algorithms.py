@@ -94,11 +94,17 @@ class OSPFRouter(Router):
             current_node = self.simulator.nodes[current]
             # Traverse all neighbours of the current node based on the network graph.
             for id, neighbour in current_node.neighbours.items():
-                total_bandwidth = 0
-                for _, link in neighbour.links.items():
-                    total_bandwidth += link.capacity / 8  # Convert to bytes
-                # Calculate the cost of the link to the neighbour node.
-                link_cost = current_node.links[id].propagation_delay + neighbour.buffer_used / total_bandwidth
+                capacity = current_node.links[id].capacity
+                queue_time = neighbour.buffer_used * 8 / capacity
+                
+                packet_size = 1500 # Assuming a standard packet size of 1500 bytes
+                transmission_time = packet_size * 8 / capacity
+
+                propagation_delay = current_node.links[id].propagation_delay
+                
+                link_cost = queue_time + transmission_time + propagation_delay
+                
+                # Compute the new accumulated cost to reach the neighbor
                 new_cost = cost + link_cost
                 # If we're at the source, the neighbour is the first hop. Otherwise, inherit the first hop.
                 nh = id if current == source else first_hop
