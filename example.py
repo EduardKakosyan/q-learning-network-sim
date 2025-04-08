@@ -122,7 +122,9 @@ def simulator_creator(
         simulator = NetworkSimulator(env, router_type)
 
         def create_router(node: int) -> Any:
-            return router_factory(router_type, node, simulator=simulator, seed=seed, **ql_params)
+            return router_factory(
+                router_type, node, simulator=simulator, seed=seed, **ql_params
+            )
 
         for node in range(1, num_nodes + 1):
             simulator.add_node(
@@ -148,7 +150,7 @@ def simulator_creator(
         return simulator
 
     if show:
-        simulator = instantiate_simulator("Dijkstra")
+        simulator = instantiate_simulator("dijkstra")
         save_network_visualization(
             simulator,
             os.path.join(output_dir, "topology.png") if output_dir else None,
@@ -192,7 +194,7 @@ def main() -> None:
     num_generators: int = 5
 
     # Simulation parameters
-    routers: List[str] = ["Dijkstra", "OSPF", "QL"]
+    routers: List[str] = ["dijkstra", "ospf", "q"]
     router_time_scale: float = 0.0
     duration: float = 10.0
 

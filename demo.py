@@ -2,12 +2,13 @@
 """Demo script to compare different routing algorithms in a simulated network."""
 
 import argparse
-from collections import Counter
-from pprint import pprint
 import random
 import time
+from collections import Counter
+from pprint import pprint
+
 import matplotlib.pyplot as plt
-from typing import Dict, List
+
 from example import simulator_creator
 from network_sim.core.simulator import NetworkSimulator
 from network_sim.utils.metrics import calculate_fairness_index
@@ -24,7 +25,13 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description="Run the specific simulations for the demo to compare results."
     )
-    parser.add_argument("num_nodes", nargs="?", type=int, default=8, help="Number of nodes in the network")
+    parser.add_argument(
+        "num_nodes",
+        nargs="?",
+        type=int,
+        default=8,
+        help="Number of nodes in the network",
+    )
     parser.add_argument(
         "--last",
         action="store_true",
@@ -37,12 +44,12 @@ def main() -> None:
     num_generators: int = num_nodes // 2
 
     # Simulation parameters
-    routers: List[str] = ["Dijkstra", "OSPF", "QL"]
+    routers: list[str] = ["dijkstra", "ospf", "q"]
     router_time_scale: float = 100.0
     duration: float = 10.0
 
     # The best Q Learning parameters:
-    ql_params: Dict[str, float] = {
+    ql_params: dict[str, float] = {
         "learning_rate": 0.5,
         "discount_factor": 0.99,
         "exploration_rate": 0.1,
@@ -52,12 +59,8 @@ def main() -> None:
 
     seed: int = random.randint(0, 2**32 - 1)
     print("Seed:", seed)
-    # seed = 1991572796 # Good for 4 excess edges
-    # seed = 2928159604 # Not bad for 16 excess edges
+    excess_edges_list: list[int] = [num_generators, num_generators**2]
 
-    excess_edges_list: List[int] = [num_generators, num_generators ** 2]
-
-    # Calculate the time scale for this computer.
     start_time = time.perf_counter()
     sum = 0
     for i in range(10000000):
@@ -91,8 +94,8 @@ def main() -> None:
             packet_scale_list = [3]
 
         for packet_scale in packet_scale_list:
-            simulator_list: List[NetworkSimulator] = []
-            metrics_list: List[dict] = []
+            simulator_list: list[NetworkSimulator] = []
+            metrics_list: list[dict] = []
             print(f"\nRunning simulations with packet_scale={packet_scale}")
             for router in routers:
                 print(f"\nRunning simulation with {router} router...")
@@ -110,7 +113,9 @@ def main() -> None:
                 print(f"  Packet loss:    {packet_loss * 100:.2f}%")
                 print(f"  Throughput:     {int(throughput)} packets")
                 print(f"  Fairness index: {fairness:.4f}")
-                print(f"  Average Routing Delays: {simulator.metrics['average_routing_delays']}")
+                print(
+                    f"  Average Routing Delays: {simulator.metrics['average_routing_delays']}"
+                )
                 if simulator.dropped_packets:
                     counter = Counter(
                         [
@@ -119,7 +124,7 @@ def main() -> None:
                         ]
                     )
                     print("  Number of packets:", len(simulator.packets))
-                    pprint(dict({k: v for k, v in counter.items()}))
+                    pprint(dict(counter.items()))
 
             plot_buffer_usages(simulator_list, show=False)
             fig_manager_1 = plt.get_current_fig_manager()

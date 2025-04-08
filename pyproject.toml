@@ -1,9 +1,11 @@
 [project]
-name = "csci4179-g2-project"
+name = "q-learning-network-sim"
 version = "0.1.0"
 description = "A comparative study of reinforcement learning-based routing (Q-routing) against traditional routing algorithms"
 authors = [
-    { name = "Eduard Kakosyan", email = "eduard.kakosyan@dal.ca" }
+    { name = "Ethan Rozee" },
+    { name = "Jack Whitmar" },
+    { name = "Eduard Kakosyan" }
 ]
 dependencies = [
     "matplotlib>=3.8.0",
@@ -15,7 +17,6 @@ dependencies = [
 ]
 requires-python = ">=3.13.1"
 readme = "README.md"
-license = { text = "MIT" }
 
 [project.optional-dependencies]
 dev = [
@@ -50,7 +51,7 @@ select = [
 ignore = []
 
 [tool.ruff.isort]
-known-first-party = ["csci4179_g2_project"]
+known-first-party = ["q_learning_network_sim"]
 
 [tool.mypy]
 python_version = "3.13"
@@ -69,4 +70,4 @@ warn_unreachable = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
-addopts = "-v --cov=csci4179_g2_project --cov-report=term-missing" 
+addopts = "-v --cov=q_learning_network_sim --cov-report=term-missing" 

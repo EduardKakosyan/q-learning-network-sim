@@ -62,15 +62,15 @@ Traditional routing methods (Dijkstra, OSPF) often struggle with dynamic adaptat
 ## Installation & Setup
 1. Clone the repository:
 ```bash
-git clone https://github.com/eduardkakosyan/csci4179-g2-project.git
-cd csci4179-g2-project
+git clone https://github.com/EduardKakosyan/q-learning-network-sim.git
+cd q-learning-network-sim
 ```
 
 2. Install Python 3.13.1 using pyenv:
 ```bash
 pyenv install 3.13.1
-pyenv virtualenv 3.13.1 csci4179-g2-project
-pyenv local csci4179-g2-project
+pyenv virtualenv 3.13.1 q-learning-network-sim
+pyenv local q-learning-network-sim
 ```
 
 3. Install dependencies using uv:
@@ -92,7 +92,7 @@ pytest
 
 1. Run a simulation:
 ```bash
-python src/main.py --topology [sparse|dense] --traffic [smooth|periodic|burst]
+python demo.py
 ```
 
 ### Configuration Options
