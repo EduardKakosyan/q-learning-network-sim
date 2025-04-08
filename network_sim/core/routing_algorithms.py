@@ -76,9 +76,10 @@ class OSPFRouter(Router):
         super().__init__(node)
         self.name = "OSPF"
         self.simulator = simulator
-        simulator.register_hook("update", self.update_routing_table)
+        simulator.register_hook("sim_start", self.update_routing_table)
+        simulator.register_hook("sim_update", self.update_routing_table)
 
-    def update_routing_table(self, sim_sim_time: float = None) -> None:
+    def update_routing_table(self, sim_time: float = None) -> None:
         """
         Update the routing table using Dijkstra's algorithm based on the complete network topology.
             
@@ -187,11 +188,6 @@ class QRouter(Router):
         # Register hooks for packet events
         simulator.register_hook("packet_arrived", self.on_packet_arrived)
         simulator.register_hook("packet_dropped", self.on_packet_dropped)
-        
-        # Initialize Q-table with entries from the routing table
-        # for destination, (cost, next_hop) in self.node.routing_table.items():
-        #     state = (self.node.id, destination, tuple([0] * len(self.node.neighbours)))
-        #     self.q_table[state][next_hop] = 1.0  # Assign a default positive Q-value
 
     def _usage_to_bin(self, usage: float) -> int:
         """
@@ -208,12 +204,12 @@ class QRouter(Router):
                 return i
         return len(self.bins)
 
-    def _get_state(self, packet: Packet) -> Tuple[int, int, Tuple[int, ...]]:
+    def _get_state(self, destination: int) -> Tuple[int, ...]:
         """
         Get the current state representation.
 
         Args:
-            packet: The packet being routed.
+            destination: The destination node ID.
 
         Returns:
             A tuple representing the state.
@@ -224,7 +220,7 @@ class QRouter(Router):
 
         bins = tuple(self._usage_to_bin(usage) for usage in buffer_usages)
 
-        state = (packet.destination, *bins)
+        state = (destination, *bins)
         return state
 
     def _get_actions(self) -> List[int]:
@@ -250,7 +246,7 @@ class QRouter(Router):
         if not self.node.queue:
             raise ValueError("Cannot schedule a packet with an empty buffer.")
 
-        state = self._get_state(packet)
+        state = self._get_state(packet.destination)
         actions = self._get_actions()
 
         if not actions:
@@ -273,30 +269,7 @@ class QRouter(Router):
         self.packet_history[packet.id] = (state, action, current_time)
 
         extra_delay, self.extra_delay = self.extra_delay, 0.0
-        return action, extra_delay
-
-    def on_packet_hop(
-        self, packet: Packet, from_node: "Node", to_node: "Node", sim_time: float
-    ) -> None:
-        """
-        Callback for packet hop event.
-
-        Args:
-            packet: The packet being routed.
-            from_node: The node from which the packet is hopping.
-            to_node: The node to which the packet is hopping.
-            sim_time: The time of the hop event.
-        """
-        start_time = time.perf_counter()
-        if packet.id in self.packet_history:
-            prev_state, prev_action, prev_time = self.packet_history[packet.id]
-
-            reward = self._calculate_hop_reward(packet, to_node, time - prev_time)
-
-            self.update_q_table(prev_state, prev_action, reward)
-            self.packet_history[packet.id] = (None, None, time)
-        self.extra_delay += time.perf_counter() - start_time
-        
+        return action, extra_delay        
 
     def on_packet_arrived(self, packet: Packet, node: "Node", sim_time: float) -> None:
         """
@@ -313,7 +286,7 @@ class QRouter(Router):
 
             reward = self._calculate_success_reward(packet)
 
-            self.update_q_table(prev_state, prev_action, reward, is_terminal=True)
+            self.update_q_table(prev_state, prev_action, reward)
             del self.packet_history[packet.id]
         self.extra_delay += time.perf_counter() - start_time
 
@@ -335,7 +308,7 @@ class QRouter(Router):
 
             reward = self._calculate_drop_reward(reason)
 
-            self.update_q_table(prev_state, prev_action, reward, is_terminal=True)
+            self.update_q_table(prev_state, prev_action, reward)
             del self.packet_history[packet.id]
         self.extra_delay += time.perf_counter() - start_time
 
@@ -435,11 +408,9 @@ class QRouter(Router):
 
     def update_q_table(
         self,
-        state: Tuple[int, int, Tuple[int, ...]],
+        state: Tuple[int, ...],
         action: int,
         reward: float,
-        next_state: Optional[Tuple[int, int, Tuple[int, ...]]] = None,
-        is_terminal: bool = False,
     ) -> None:
         """
         Update the Q-table using the Q-Learning update rule.
@@ -448,23 +419,12 @@ class QRouter(Router):
             state: Current state.
             action: Action taken.
             reward: Reward received.
-            next_state: Resulting state (None for terminal states).
             is_terminal: Whether this is a terminal state.
         """
         if state is None or action is None:
             return
 
-        if is_terminal or next_state is None:
-            # For terminal states or unknown next states, use immediate reward
-            max_next_q = 0
-        else:
-            # For normal transitions, include expected future rewards
-            next_actions = self._get_actions()
-            if next_actions:
-                next_q_values = [self.q_table[next_state][a] for a in next_actions]
-                max_next_q = max(next_q_values) if next_q_values else 0
-            else:
-                max_next_q = 0
+        max_next_q = 0.0
 
         current_q = self.q_table[state][action]
         new_q = current_q + self.learning_rate * (

@@ -74,7 +74,8 @@ class NetworkSimulator:
             "packet_hop": [],  # packet moves between nodes
             "packet_arrived": [],  # packet reaches destination
             "packet_dropped": [],  # packet dropped
-            "update": [],  # simulation update
+            "sim_start": [],  # simulation starts
+            "sim_update": [],  # simulation update
             "sim_end": [],  # the simulation ends
         }
 
@@ -476,13 +477,15 @@ class NetworkSimulator:
 
             self.env.process(update())
 
-        def heartbeat():
+        def update():
             while True:
-                self.call_hooks("update", self.env.now)
                 yield self.env.timeout(0.1)
+                self.call_hooks("sim_update", self.env.now)
 
-        self.env.process(heartbeat())
-
+        self.env.process(update())
+        
+        self.call_hooks("sim_start")
+        
         self.env.run(until=duration)
 
         if drop_actives:
