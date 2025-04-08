@@ -5,26 +5,28 @@ This script demonstrates how to use the network_sim package to create and run
 a simple network simulation with different routers.
 """
 
-from collections import Counter
-from pprint import pprint
-from typing import Any, Callable, Dict, List, Tuple
-import numpy as np
 import os
 import random
+from collections import Counter
+from collections.abc import Callable
+from pprint import pprint
+from typing import Any
+
+import numpy as np
 import simpy
 
-from network_sim.core.simulator import NetworkSimulator
 from network_sim.core.routing_algorithms import router_factory
+from network_sim.core.simulator import NetworkSimulator
 from network_sim.traffic.generators import bimodal_size, bursty_traffic, poisson_traffic
-from network_sim.utils.visualization import (
-    save_network_visualization,
-    plot_metrics,
-    plot_link_utilizations,
-)
 from network_sim.utils.metrics import (
-    save_metrics_to_json,
-    compare_routers,
     calculate_fairness_index,
+    compare_routers,
+    save_metrics_to_json,
+)
+from network_sim.utils.visualization import (
+    plot_link_utilizations,
+    plot_metrics,
+    save_network_visualization,
 )
 
 
@@ -33,9 +35,10 @@ def simulator_creator(
     excess_edges: int,
     num_generators: int,
     router_time_scale: float = 1.0,
-    ql_params: Dict[str, Any] = {},
+    ql_params: dict[str, Any] | None = None,
     seed: int = 42,
     output_dir: str | None = None,
+    *,
     log: bool = False,
     show: bool = True,
     block: bool = True,
@@ -59,11 +62,12 @@ def simulator_creator(
     """
     random.seed(seed)
     np.random.seed(seed)
+    ql_params = ql_params or {}
 
-    def generate_random_graph(n: int, excess_edges: int) -> List[Tuple[int, int]]:
+    def generate_random_graph(n: int, excess_edges: int) -> list[tuple[int, int]]:
         """Generate a random graph with a minimum spanning tree and excess edges."""
-        edges: List[Tuple[int, int]] = []
-        nodes: List[int] = list(range(1, n + 1))
+        edges: list[tuple[int, int]] = []
+        nodes: list[int] = list(range(1, n + 1))
         random.shuffle(nodes)
 
         # Create a minimum spanning tree
@@ -71,7 +75,7 @@ def simulator_creator(
             edges.append((nodes[i], nodes[i + 1]))
 
         # Add excess edges
-        possible_edges: List[Tuple[int, int]] = [
+        possible_edges: list[tuple[int, int]] = [
             (i, j)
             for i in nodes
             for j in nodes
@@ -84,16 +88,16 @@ def simulator_creator(
 
     edges = generate_random_graph(num_nodes, excess_edges)
 
-    link_delays: List[float] = [random.uniform(0.001, 0.05) for _ in range(len(edges))]
+    link_delays: list[float] = [random.uniform(0.001, 0.05) for _ in range(len(edges))]
 
-    possible_node_pairs: List[Tuple[int, int]] = []
+    possible_node_pairs: list[tuple[int, int]] = []
     # Generate all possible directed edges between non-neighbor nodes
     for i in range(1, num_nodes + 1):
         for j in range(1, num_nodes + 1):
             if i != j and (i, j) not in edges and (j, i) not in edges:
                 possible_node_pairs.append((i, j))
 
-    node_pairs: List[Tuple[int, int]] = []
+    node_pairs: list[tuple[int, int]] = []
     while len(possible_node_pairs) > 0:
         source, destination = random.sample(possible_node_pairs, 1)[0]
         node_pairs.append((source, destination))
@@ -134,7 +138,7 @@ def simulator_creator(
                 time_scale=router_time_scale,
             )
 
-        for edge, delay in zip(edges, link_delays):
+        for edge, delay in zip(edges, link_delays, strict=True):
             simulator.add_link(edge[0], edge[1], 1e5, delay)
 
         simulator.compute_shortest_paths()
@@ -194,12 +198,12 @@ def main() -> None:
     num_generators: int = 5
 
     # Simulation parameters
-    routers: List[str] = ["dijkstra", "ospf", "q"]
+    routers: list[str] = ["dijkstra", "ospf", "q"]
     router_time_scale: float = 0.0
     duration: float = 10.0
 
     # The best Q Learning parameters:
-    ql_params: Dict[str, float] = {
+    ql_params: dict[str, float] = {
         "learning_rate": 0.1,
         "discount_factor": 0.99,
         "exploration_rate": 0.2,
@@ -217,8 +221,8 @@ def main() -> None:
         log=True,
     )
 
-    simulators: List[NetworkSimulator] = []
-    metrics_list: List[Dict[str, Any]] = []
+    simulators: list[NetworkSimulator] = []
+    metrics_list: list[dict[str, Any]] = []
     for router in routers:
         print(f"Running simulation with {router} router...")
         simulator = run_simulation(simulator_func, router, duration)

@@ -92,8 +92,10 @@ pytest
 
 1. Run a simulation:
 ```bash
-python demo.py
+python demo.py [num_nodes] [--last]
 ```
+num_nodes is the number of nodes in the network. (default: 8)
+--last is an optional flag to run the last item from both for loops.
 
 ### Configuration Options
 

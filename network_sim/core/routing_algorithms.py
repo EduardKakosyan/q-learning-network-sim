@@ -1,10 +1,14 @@
 """Routing algorithms implementation for network simulation."""
 
+from __future__ import annotations
+
+import heapq
+import time
 from abc import ABC, abstractmethod
 from collections import defaultdict
-import time
-from typing import Dict, List, Optional, Tuple, TYPE_CHECKING, Any
-import heapq
+from collections.abc import Generator
+from typing import TYPE_CHECKING, Any
+
 import numpy as np
 
 from network_sim.core.packet import Packet
@@ -18,7 +22,7 @@ if TYPE_CHECKING:
 class Router(ABC):
     """Abstract base class for routing algorithms."""
 
-    def __init__(self, node: "Node") -> None:
+    def __init__(self, node: Node) -> None:
         """Initialize the router.
 
         Args:
@@ -29,7 +33,7 @@ class Router(ABC):
         self.extra_delay = 0.0
 
     @abstractmethod
-    def route_packet(self, packet: Packet) -> Tuple[int, float]:
+    def route_packet(self, packet: Packet) -> tuple[int, float]:
         """Determine the next hop for a packet.
 
         Args:
@@ -53,7 +57,7 @@ class Router(ABC):
 class DijkstraRouter(Router):
     """Router using Dijkstra's algorithm for shortest path routing."""
 
-    def __init__(self, node: "Node") -> None:
+    def __init__(self, node: Node) -> None:
         """Initialize the Dijkstra router.
 
         Args:
@@ -62,7 +66,7 @@ class DijkstraRouter(Router):
         super().__init__(node)
         self.name = "Dijk"
 
-    def route_packet(self, packet: Packet) -> Tuple[int, float]:
+    def route_packet(self, packet: Packet) -> tuple[int, float]:
         """Route the packet using Dijkstra's algorithm.
 
         Args:
@@ -86,7 +90,7 @@ class DijkstraRouter(Router):
 class OSPFRouter(Router):
     """OSPF-based routing algorithm using link-state information and Dijkstra's algorithm."""
 
-    def __init__(self, node: "Node", simulator: "NetworkSimulator") -> None:
+    def __init__(self, node: Node, simulator: NetworkSimulator) -> None:
         """Initialize the OSPF router.
 
         Args:
@@ -98,7 +102,7 @@ class OSPFRouter(Router):
         self.simulator = simulator
         simulator.register_hook("sim_start", self.update_routing_table)
 
-        def update() -> None:
+        def update() -> Generator[float, None, None]:
             """Periodically update the routing table based on buffer usage."""
             while True:
                 timeout = max(self.node.buffer_usage(), 0.1)
@@ -107,7 +111,7 @@ class OSPFRouter(Router):
 
         self.simulator.env.process(update())
 
-    def update_routing_table(self, sim_time: Optional[float] = None) -> None:
+    def update_routing_table(self, sim_time: float | None = None) -> None:
         """Update the routing table using Dijkstra's algorithm.
 
         Args:
@@ -119,7 +123,7 @@ class OSPFRouter(Router):
         start_time = time.perf_counter()
         source = self.node.id
         queue = [(0, source, None)]
-        distances: Dict[int, Tuple[float, Optional[int]]] = {source: (0, None)}
+        distances: dict[int, tuple[float, int | None]] = {source: (0, None)}
 
         while queue:
             cost, current, first_hop = heapq.heappop(queue)
@@ -146,7 +150,7 @@ class OSPFRouter(Router):
         self.routing_table = distances
         self.extra_delay += time.perf_counter() - start_time
 
-    def route_packet(self, packet: Packet) -> Tuple[int, float]:
+    def route_packet(self, packet: Packet) -> tuple[int, float]:
         """Select the next hop for the given packet.
 
         Args:
@@ -182,8 +186,8 @@ class QRouter(Router):
 
     def __init__(
         self,
-        node: "Node",
-        simulator: "NetworkSimulator",
+        node: Node,
+        simulator: NetworkSimulator,
         learning_rate: float = 0.1,
         discount_factor: float = 0.9,
         exploration_rate: float = 0.1,
@@ -214,7 +218,7 @@ class QRouter(Router):
         ][1:]
         self.q_table = defaultdict(lambda: defaultdict(float))
         self.rng = CustomRNG(seed)
-        self.packet_history: Dict[int, Tuple[Tuple[int, ...], int, float]] = {}
+        self.packet_history: dict[int, tuple[tuple[int, ...], int, float]] = {}
 
         simulator.register_hook("packet_arrived", self.on_packet_arrived)
         simulator.register_hook("packet_dropped", self.on_packet_dropped)
@@ -233,7 +237,7 @@ class QRouter(Router):
                 return i
         return len(self.bins)
 
-    def _get_state(self, destination: int) -> Tuple[int, ...]:
+    def _get_state(self, destination: int) -> tuple[int, ...]:
         """Get the current state representation.
 
         Args:
@@ -248,7 +252,7 @@ class QRouter(Router):
         bins = tuple(self._usage_to_bin(usage) for usage in buffer_usages)
         return (destination, *bins)
 
-    def _get_actions(self) -> List[int]:
+    def _get_actions(self) -> list[int]:
         """Get available actions in the current state.
 
         Returns:
@@ -256,7 +260,7 @@ class QRouter(Router):
         """
         return list(self.node.links.keys())
 
-    def route_packet(self, packet: Packet) -> Tuple[int, float]:
+    def route_packet(self, packet: Packet) -> tuple[int, float]:
         """Route the packet using Q-Learning.
 
         Args:
@@ -289,7 +293,7 @@ class QRouter(Router):
         extra_delay, self.extra_delay = self.extra_delay, 0.0
         return next_hop, extra_delay
 
-    def on_packet_arrived(self, packet: Packet, node: "Node", sim_time: float) -> None:
+    def on_packet_arrived(self, packet: Packet, node: Node, sim_time: float) -> None:
         """Handle packet arrival event.
 
         Args:
@@ -305,7 +309,7 @@ class QRouter(Router):
             del self.packet_history[packet.id]
 
     def on_packet_dropped(
-        self, packet: Packet, node: "Node", reason: str, sim_time: float
+        self, packet: Packet, node: Node, reason: str, sim_time: float
     ) -> None:
         """Handle packet drop event.
 
@@ -322,7 +326,7 @@ class QRouter(Router):
             del self.packet_history[packet.id]
 
     def _calculate_hop_reward(
-        self, packet: Packet, to_node: "Node", time_diff: float
+        self, packet: Packet, to_node: Node, time_diff: float
     ) -> float:
         """Calculate reward for successful packet hop.
 
@@ -371,7 +375,7 @@ class QRouter(Router):
 
     def update_q_table(
         self,
-        state: Tuple[int, ...],
+        state: tuple[int, ...],
         action: int,
         reward: float,
     ) -> None:
@@ -392,8 +396,8 @@ class QRouter(Router):
 
 def router_factory(
     router_type: str,
-    node: "Node",
-    simulator: Optional["NetworkSimulator"] = None,
+    node: Node,
+    simulator: NetworkSimulator | None = None,
     seed: int = 42,
     **kwargs: Any,
 ) -> Router:
