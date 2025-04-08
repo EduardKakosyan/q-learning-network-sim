@@ -483,9 +483,9 @@ class NetworkSimulator:
                 self.call_hooks("sim_update", self.env.now)
 
         self.env.process(update())
-        
+
         self.call_hooks("sim_start")
-        
+
         self.env.run(until=duration)
 
         if drop_actives:

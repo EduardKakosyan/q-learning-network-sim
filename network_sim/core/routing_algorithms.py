@@ -77,12 +77,18 @@ class OSPFRouter(Router):
         self.name = "OSPF"
         self.simulator = simulator
         simulator.register_hook("sim_start", self.update_routing_table)
-        simulator.register_hook("sim_update", self.update_routing_table)
+        def update():
+            while True:
+                timeout = max(self.node.buffer_usage(), 0.1)
+                yield self.simulator.env.timeout(timeout)
+                self.update_routing_table()
+
+        self.simulator.env.process(update())
 
     def update_routing_table(self, sim_time: float = None) -> None:
         """
         Update the routing table using Dijkstra's algorithm based on the complete network topology.
-            
+
         :param network_graph: A dictionary representing the network topology,
                             mapping node ids to their neighbours and associated link costs.
                             Example: {node_id: {neighbour_id: cost, ...}, ...}
@@ -102,14 +108,14 @@ class OSPFRouter(Router):
             for id, neighbour in current_node.neighbours.items():
                 capacity = current_node.links[id].capacity
                 queue_time = neighbour.buffer_used * 8 / capacity
-                
+
                 packet_size = 1500 # Assuming a standard packet size of 1500 bytes
                 transmission_time = packet_size * 8 / capacity
 
                 propagation_delay = current_node.links[id].propagation_delay
-                
+
                 link_cost = queue_time + transmission_time + propagation_delay
-                
+
                 if link_cost < 0:
                     if queue_time < 0:
                         raise ValueError("Queue time cannot be negative.")
@@ -118,7 +124,7 @@ class OSPFRouter(Router):
                     if propagation_delay < 0:
                         raise ValueError("Propagation delay cannot be negative.")
                     raise ValueError("Link cost cannot be negative. Not sure what the cause is.")
-                
+
                 # Compute the new accumulated cost to reach the neighbor
                 new_cost = cost + link_cost
                 # If we're at the source, the neighbour is the first hop. Otherwise, inherit the first hop.
@@ -128,7 +134,7 @@ class OSPFRouter(Router):
                     heapq.heappush(queue, (new_cost, id, nh))
 
         self.routing_table = distances
-        
+
         self.extra_delay += time.perf_counter() - start_time
 
     def route_packet(self, packet: Packet) -> Tuple[int, float]:
@@ -278,7 +284,7 @@ class QRouter(Router):
         self.packet_history[packet.id] = (state, action, current_time)
 
         extra_delay, self.extra_delay = self.extra_delay, 0.0
-        return action, extra_delay        
+        return action, extra_delay
 
     def on_packet_arrived(self, packet: Packet, node: "Node", sim_time: float) -> None:
         """
